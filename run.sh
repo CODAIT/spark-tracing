@@ -6,7 +6,7 @@ sparkver="2.3.0-SNAPSHOT" #$(cat $basedir/docs/_config.yml | grep '^SPARK_VERSIO
 hadoopver="2.8.1"
 hadoopvershort=$(echo "$hadoopver" | cut -d '.' -f -2)
 
-basedir="$HOME/code/spark-instrumented"
+basedir="$HOME/code/spark"
 distdir="$basedir/mindist"
 resultdir="$HOME/code/spark-tracing/runs"
 #cluster="dynalloc"
@@ -24,23 +24,26 @@ testclass="org.apache.spark.examples.SparkPi"
 testjar="spark-examples_${scalaver}-$sparkver.jar"
 iters=20
 
-pushd "$basedir"
 while [[ $# > 0 ]]
 	do case "$1" in
-	"dist")
-		"$basedir/dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
-		;;
-	"clean")
-		"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests clean
-		;;
+	#"dist")
+	#	"$basedir/dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
+	#	;;
+	#"clean")
+	#	"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests clean
+	#	;;
+	#"build")
+	#	"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
+	#	;;
 	"build")
-		"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
+		pushd "instrument"
+		sbt package
+		popd
 		;;
 	"conf")
 		cat <<- ! > $basedir/conf/spark-defaults.conf
 		spark.master.ui.port $port
 		spark.worker.ui.port $port
-		spark.extraListeners org.apache.spark.util.tracing.ListenerTraceLogger
 		spark.hadoop.yarn.timeline-service.enabled false
 		spark.executor.instances 1
 		spark.executor.memory 512m
@@ -59,20 +62,14 @@ while [[ $# > 0 ]]
 		#spark.eventLog.enabled true
 		spark.executor.cores 1
 		spark.task.cpus 1
+
+		#spark.driver.extraJavaOptions -javaagent:$dest/instrument_2.11-1.0.jar
+		#spark.yarn.am.extraJavaOptions -javaagent:$dest/instrument_2.11-1.0.jar
+		spark.executor.extraJavaOptions -javaagent:$dest/instrument_2.11-1.0.jar
 		!
 		cp $basedir/conf/log4j.properties{.template,}
 		cat <<- ! >> $basedir/conf/log4j.properties
-
 		log4j.rootCategory=INFO, console
-
-		log4j.logger.org.apache.spark.util.tracing.TraceLogger=TRACE, eventtrace
-		log4j.additivity.org.apache.spark.util.tracing.TraceLogger=false
-
-		log4j.appender.eventtrace=org.apache.spark.util.tracing.IdFileAppender
-		log4j.appender.eventtrace.File=$traceout/%i.tsv
-		log4j.appender.eventtrace.Append=false
-		log4j.appender.eventtrace.layout=org.apache.log4j.PatternLayout
-		log4j.appender.eventtrace.layout.ConversionPattern=%m%n
 		!
 		cat <<- ! >> $basedir/conf/spark-env.sh
 		HADOOP_CONF_DIR=/etc/hadoop/conf
@@ -92,7 +89,7 @@ while [[ $# > 0 ]]
 		#ssh -t $user@$master "$dest/sbin/stop-all.sh; for host in $slaves; do ssh \$host $dest/sbin/stop-all.sh; done"
 		#ssh -t $user@$master "$dest/sbin/start-master.sh; for host in $slaves; do ssh \$host $dest/sbin/start-slave.sh $master:7077; done"
 		#firefox http://$master:$port &
-		ssh -t $user@$master sudo -iu notebook $dest/bin/spark-submit --master yarn --class "$testclass" "$dest/examples/jars/$testjar" $iters
+		ssh -t $user@$master sudo -iu notebook SPARK_PRINT_LAUNCH_COMMAND=1 $dest/bin/spark-submit --conf spark.driver.extraJavaOptions="-javaagent:$dest/instrument_2.11-1.0.jar" --conf spark.yarn.am.extraJavaOptions="-javaagent:$dest/instrument_2.11-1.0.jar" --master yarn --class "$testclass" "$dest/examples/jars/$testjar" $iters
 		;;
 	"collect")
 		ssh -t $user@$master "sudo chown -R dev-user $traceout; for host in $slaves; do ssh -t \$host sudo chown -R dev-user $traceout; done"
@@ -104,7 +101,7 @@ while [[ $# > 0 ]]
 		ssh -t $user@$master "rm -r $traceout; for host in $slaves; do ssh -t \$host rm -r $traceout; done"
 		;;
 	"local")
-		$distdir/sbin/stop-all.sh
+		#$distdir/sbin/stop-all.sh
 		rm -rf $traceout
 		$distdir/bin/spark-submit --master yarn --class "$testclass" "$distdir/examples/jars/$testjar" $iters
 		;;
