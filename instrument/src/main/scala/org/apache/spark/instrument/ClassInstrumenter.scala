@@ -8,8 +8,8 @@ import org.apache.spark.instrument.actions._
 
 class ClassInstrumenter() extends ClassFileTransformer {
   val targets = Seq(
-    //new Call("org.apache.spark.util.Utils$", "initDaemon"),
-    //new RpcIntercept,
+    //new Call("org.apache.spark.util.Utils$", "initDaemon"), // Debug
+    new RpcIntercept,
     new EndpointInfo,
     new MainLogger
     //new ExitLogger // Not working: NoClassDefFound.  Try using a shutdown hook?

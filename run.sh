@@ -26,15 +26,20 @@ iters=20
 
 while [[ $# > 0 ]]
 	do case "$1" in
-	#"dist")
+	#"spark-dist")
 	#	"$basedir/dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
 	#	;;
-	#"clean")
+	#"spark-clean")
 	#	"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests clean
 	#	;;
-	#"build")
+	#"spark-build")
 	#	"$basedir/build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
 	#	;;
+	"clean")
+		pushd "instrument"
+		sbt clean
+		popd
+		;;
 	"build")
 		pushd "instrument"
 		sbt package
