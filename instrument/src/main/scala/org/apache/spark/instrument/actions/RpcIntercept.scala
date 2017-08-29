@@ -5,23 +5,34 @@ import javassist.CtMethod
 
 import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
 import org.apache.spark.network.client.TransportClient
+import org.apache.spark.rpc.RpcEnvConfig
 
-case class SparkHost(name: String, host: String, port: Int)
+case class Service(name: String, host: SocketAddress)
 case class RPC(src: SocketAddress, dst: SocketAddress, payload: Any)
 
 object RpcIntercept {
+  var curService: Option[String] = None
+  def newEndpoint(config: RpcEnvConfig): Unit = curService = Some(config.name)
   def log(client: TransportClient, msg: Any): Unit = {
+    if (curService.isDefined) {
+      TraceWriter.log(System.currentTimeMillis, Service(curService.get, client.getChannel.localAddress))
+      curService = None
+    }
     TraceWriter.log(System.currentTimeMillis, RPC(client.getChannel.remoteAddress, client.getChannel.localAddress, msg))
   }
   def log(client: scala.Function0[TransportClient], msg: Any): Unit = () // Conveniently, this seems to always duplicate the one above
 }
 
 class RpcIntercept() extends MethodInstrumentation {
+  private def isRpc(method: CtMethod) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnv", "deserialize")
+  private def isCreate(method: CtMethod) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnvFactory", "create")
   override def matches(method: CtMethod): Boolean = {
-    method.getDeclaringClass.getName == "org.apache.spark.rpc.netty.NettyRpcEnv" && method.getName == "deserialize"
+    isRpc(method) || isCreate(method)
   }
   override def apply(method: CtMethod): Unit = {
-    val report = functionCall(this.getClass.getCanonicalName, "log", Seq("$1", "$_"))
+    val report =
+      if (isRpc(method)) functionCall(this.getClass.getCanonicalName, "log", Seq("$1", "$_"))
+      else functionCall(this.getClass.getCanonicalName, "newEndpoint", Seq("$1"))
     method.insertAfter(report)
   }
 }

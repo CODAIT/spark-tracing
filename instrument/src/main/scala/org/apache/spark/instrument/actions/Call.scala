@@ -13,7 +13,7 @@ object Call {
 
 class Call(cls: String, name: String) extends MethodInstrumentation {
   override def matches(method: CtMethod): Boolean = {
-    method.getDeclaringClass.getName == cls && method.getName == name
+    check(method, cls, name)
   }
   override def apply(method: CtMethod): Unit = {
     val report = functionCall(this.getClass.getCanonicalName, "log", Seq("start", str(method.getLongName), "$args", "ret"))

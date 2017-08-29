@@ -21,7 +21,7 @@ object MainLogger {
 
 class MainLogger extends MethodInstrumentation {
   override def matches(method: CtMethod): Boolean = {
-    method.getName == "main" && !method.isEmpty
+    check(method, None, Some("main"))
   }
   override def apply(method: CtMethod): Unit = {
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "logStart", Seq()))

@@ -21,7 +21,7 @@ object TraceWriter {
   // TODO add shutdown hook to close out
   // TODO synchronize write...maybe make async
   def log(time: Long, event: Any): Unit = {
-    write(Seq(id, time, event.toString).mkString("\t"))
+    write(Seq(id, time, event.toString.split("\n")(0)).mkString("\t"))
   }
 
   out.write("id\ttime\ttype\n")

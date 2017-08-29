@@ -10,8 +10,10 @@ class ClassInstrumenter() extends ClassFileTransformer {
   val targets = Seq(
     //new Call("org.apache.spark.util.Utils$", "initDaemon"), // Debug
     new RpcIntercept,
-    new EndpointInfo,
-    new MainLogger
+    new MainLogger,
+    new DagScheduler,
+    new BlockManager,
+    new TaskScheduler
     //new ExitLogger // Not working: NoClassDefFound.  Try using a shutdown hook?
   )
 

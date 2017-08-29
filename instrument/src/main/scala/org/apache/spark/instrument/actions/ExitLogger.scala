@@ -13,7 +13,7 @@ object ExitLogger {
 
 class ExitLogger extends MethodInstrumentation {
   override def matches(method: CtMethod): Boolean = {
-    method.getDeclaringClass.getName == "java.lang.Shutdown" && method.getName == "exit"
+    check(method, "java.lang.Shutdown", "exit")
   }
   override def apply(method: CtMethod): Unit = {
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "log", Seq("$1")))
