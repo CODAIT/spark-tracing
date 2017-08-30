@@ -1,10 +1,14 @@
 package org.apache.spark.instrument
 
+import java.util.UUID
 import javassist._
 
 trait MethodType
 case class Method(name: String) extends MethodType
 case object Constructor extends MethodType
+
+case class ProcessStart(id: UUID, process: Any)
+case class ProcessEnd(id: UUID, process: Any)
 
 abstract class MethodInstrumentation() {
   final val prefix = "StcSparkInstr_"

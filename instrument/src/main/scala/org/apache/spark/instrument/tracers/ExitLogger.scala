@@ -1,4 +1,4 @@
-package org.apache.spark.instrument.actions
+package org.apache.spark.instrument.tracers
 
 import javassist._
 import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}

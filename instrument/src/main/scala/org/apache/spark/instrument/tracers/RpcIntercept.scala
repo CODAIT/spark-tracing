@@ -1,4 +1,4 @@
-package org.apache.spark.instrument.actions
+package org.apache.spark.instrument.tracers
 
 import java.net.SocketAddress
 import javassist.CtMethod

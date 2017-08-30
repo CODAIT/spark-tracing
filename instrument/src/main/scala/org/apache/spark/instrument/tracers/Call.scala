@@ -1,13 +1,18 @@
-package org.apache.spark.instrument.actions
+package org.apache.spark.instrument.tracers
 
+import java.util.UUID
 import javassist._
-import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
+import org.apache.spark.instrument._
 
-case class FunctionCall(name: String, duration: Long, args: Seq[Any], ret: Any)
+case class FunctionCall(name: String, args: Seq[Any], ret: Any)
 
 object Call {
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = {
-    TraceWriter.log(start, FunctionCall(name, System.currentTimeMillis - start, args.toSeq, ret))
+    val end = System.currentTimeMillis
+    val id: UUID = UUID.randomUUID
+    val call = FunctionCall(name, args.toSeq, ret)
+    TraceWriter.log(start, ProcessStart(id, call))
+    TraceWriter.log(end, ProcessEnd(id, call))
   }
 }
 

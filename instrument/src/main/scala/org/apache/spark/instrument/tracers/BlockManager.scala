@@ -1,4 +1,4 @@
-package org.apache.spark.instrument.actions
+package org.apache.spark.instrument.tracers
 
 import javassist.CtMethod
 
@@ -31,8 +31,10 @@ object BlockManager {
 
 class BlockManager extends MethodInstrumentation {
   import BlockManager._
-  def isManager(method: CtMethod): Boolean = check(method, "org.apache.spark.storage.BlockManager") && managerFuncs.contains(method.getName)
-  def isMaster(method: CtMethod): Boolean = check(method, "org.apache.spark.storage.BlockManagerMaster") && masterFuncs.contains(method.getName)
+  def isManager(method: CtMethod): Boolean =
+    check(method, "org.apache.spark.storage.BlockManager") && managerFuncs.contains(method.getName)
+  def isMaster(method: CtMethod): Boolean =
+    check(method, "org.apache.spark.storage.BlockManagerMaster") && masterFuncs.contains(method.getName)
   override def matches(method: CtMethod): Boolean = isManager(method) || isMaster(method)
 
   override def apply(method: CtMethod): Unit = {

@@ -76,7 +76,8 @@ while [[ $# > 0 ]]
 		cat <<- ! >> $basedir/conf/log4j.properties
 		log4j.rootCategory=INFO, console
 		!
-		cat <<- ! >> $basedir/conf/spark-env.sh
+		cat <<- ! > $basedir/conf/spark-env.sh
+		SPARK_HOME=$dest
 		HADOOP_CONF_DIR=/etc/hadoop/conf
 		!
 

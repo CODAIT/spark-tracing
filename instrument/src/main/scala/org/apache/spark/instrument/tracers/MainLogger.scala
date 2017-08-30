@@ -1,11 +1,12 @@
-package org.apache.spark.instrument.actions
+package org.apache.spark.instrument.tracers
 
 import java.lang.management.ManagementFactory
+import java.util.UUID
 import javassist._
+import org.apache.spark.instrument._
 
-import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
-
-case class JVMStart(duration: Long)
+//case class JVMStart(duration: Long)
+case object JVMStart
 case object MainEnd
 
 object MainLogger {
@@ -13,8 +14,12 @@ object MainLogger {
   def logStart(): Unit = {
     if (!alreadyLogged) {
       alreadyLogged = true
+      val end = System.currentTimeMillis
+      val id = UUID.randomUUID
       val start = ManagementFactory.getRuntimeMXBean.getStartTime
-      TraceWriter.log(start, JVMStart(System.currentTimeMillis - start))
+      //TraceWriter.log(start, JVMStart(System.currentTimeMillis - start))
+      TraceWriter.log(start, ProcessStart(id, JVMStart))
+      TraceWriter.log(end, ProcessEnd(id, JVMStart))
     }
   }
 }
