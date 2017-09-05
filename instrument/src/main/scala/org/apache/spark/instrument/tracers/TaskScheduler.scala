@@ -1,7 +1,6 @@
 package org.apache.spark.instrument.tracers
 
-import javassist.CtMethod
-
+import javassist._
 import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
 import org.apache.spark.scheduler.{TaskSet, TaskSetManager}
 
@@ -15,10 +14,10 @@ object TaskScheduler {
 }
 
 class TaskScheduler extends MethodInstrumentation {
-  override def matches(method: CtMethod): Boolean = {
+  override def matches(method: CtBehavior): Boolean = {
     check(method, "org.apache.spark.scheduler.TaskSchedulerImpl") && Set("submitTasks", "taskSetFinished").contains(method.getName)
   }
-  override def apply(method: CtMethod): Unit = {
+  override def apply(method: CtBehavior): Unit = {
     val report = functionCall(this.getClass.getCanonicalName, "log", Seq("$1"))
     method.insertBefore(report)
   }

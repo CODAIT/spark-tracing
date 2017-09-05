@@ -25,10 +25,10 @@ object MainLogger {
 }
 
 class MainLogger extends MethodInstrumentation {
-  override def matches(method: CtMethod): Boolean = {
+  override def matches(method: CtBehavior): Boolean = {
     check(method, None, Some("main"))
   }
-  override def apply(method: CtMethod): Unit = {
+  override def apply(method: CtBehavior): Unit = {
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "logStart", Seq()))
     //method.insertAfter(functionCall(this.getClass.getCanonicalName, "logEnd", Seq()))
   }

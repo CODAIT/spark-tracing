@@ -12,10 +12,11 @@ object ExitLogger {
 }
 
 class ExitLogger extends MethodInstrumentation {
-  override def matches(method: CtMethod): Boolean = {
+  override def matches(method: CtBehavior): Boolean = {
     check(method, "java.lang.Shutdown", "exit")
   }
-  override def apply(method: CtMethod): Unit = {
+  override def apply(method: CtBehavior): Unit = {
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "log", Seq("$1")))
+    //method.insertBefore("{ java.io.FileWriter out = new java.io.FileWriter(\"/tmp/spark-trace/\" + java.util.UUID.randomUUID().toString() + \".tsv\"); out.write(System.currentTimeMillis().toString() + \"\\t\" + \"Exit($1)\\n\"); out.close(); }")
   }
 }

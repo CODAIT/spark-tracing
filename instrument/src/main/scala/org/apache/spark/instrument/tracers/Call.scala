@@ -4,8 +4,6 @@ import java.util.UUID
 import javassist._
 import org.apache.spark.instrument._
 
-case class FunctionCall(name: String, args: Seq[Any], ret: Any)
-
 object Call {
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = {
     val end = System.currentTimeMillis
@@ -17,10 +15,9 @@ object Call {
 }
 
 class Call(cls: String, name: String) extends MethodInstrumentation {
-  override def matches(method: CtMethod): Boolean = {
-    check(method, cls, name)
-  }
-  override def apply(method: CtMethod): Unit = {
+  override def matches(method: CtBehavior): Boolean = check(method, cls, name)
+
+  override def apply(method: CtBehavior): Unit = {
     val report = functionCall(this.getClass.getCanonicalName, "log", Seq("start", str(method.getLongName), "$args", "ret"))
     wrap(method, "long start = System.currentTimeMillis();", report)
   }

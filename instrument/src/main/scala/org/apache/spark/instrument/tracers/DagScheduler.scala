@@ -1,7 +1,6 @@
 package org.apache.spark.instrument.tracers
 
-import javassist.CtMethod
-
+import javassist._
 import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
 
 case class DagSchedulerEvent(event: Any)
@@ -12,8 +11,8 @@ object DagScheduler {
 }
 
 class DagScheduler extends MethodInstrumentation {
-  override def matches(method: CtMethod): Boolean =
+  override def matches(method: CtBehavior): Boolean =
     check(method, "org.apache.spark.scheduler.DAGSchedulerEventProcessLoop", "doOnReceive")
-  override def apply(method: CtMethod): Unit =
+  override def apply(method: CtBehavior): Unit =
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "log", Seq("$1")))
 }
