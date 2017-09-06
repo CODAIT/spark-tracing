@@ -2,14 +2,14 @@ package org.apache.spark.instrument.tracers
 
 import java.net.SocketAddress
 import javassist._
-import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
+import org.apache.spark.instrument._
 import org.apache.spark.network.client.TransportClient
 import org.apache.spark.rpc.RpcEnvConfig
 
-case class Service(name: String, host: SocketAddress)
-case class RPC(src: SocketAddress, dst: SocketAddress, payload: Any)
+case class Service(name: String, host: SocketAddress) extends TraceEvent
+case class RPC(src: SocketAddress, dst: SocketAddress, payload: Any) extends TraceEvent
 
-object Rpcs {
+object RpcLogger {
   var curService: Option[String] = None
   def newEndpoint(config: RpcEnvConfig): Unit = curService = Some(config.name)
   def log(client: TransportClient, msg: Any): Unit = {
@@ -19,10 +19,10 @@ object Rpcs {
     }
     TraceWriter.log(System.currentTimeMillis, RPC(client.getChannel.remoteAddress, client.getChannel.localAddress, msg))
   }
-  def log(client: scala.Function0[TransportClient], msg: Any): Unit = () // Conveniently, this seems to always duplicate the one above
+  def log(client: scala.Function0[TransportClient], msg: Any): Unit = ()
 }
 
-class Rpcs() extends MethodInstrumentation {
+class RpcLogger() extends MethodInstrumentation {
   private def isRpc(method: CtBehavior) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnv", "deserialize")
   private def isCreate(method: CtBehavior) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnvFactory", "create")
   override def matches(method: CtBehavior): Boolean = {

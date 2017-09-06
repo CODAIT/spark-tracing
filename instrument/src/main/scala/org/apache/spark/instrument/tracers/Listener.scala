@@ -1,6 +1,6 @@
 package org.apache.spark.instrument.tracers
 
-import javassist._
+/*import javassist._
 
 import org.apache.spark.instrument.{MethodInstrumentation, TraceWriter}
 import org.apache.spark.scheduler.SparkListenerEvent
@@ -18,4 +18,4 @@ class Listener extends MethodInstrumentation {
   override def apply(method: CtBehavior): Unit = {
     method.insertBefore(functionCall(this.getClass.getCanonicalName, "log", Seq("$1")))
   }
-}
+}*/

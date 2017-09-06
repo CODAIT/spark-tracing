@@ -4,17 +4,20 @@ import java.util.UUID
 import javassist._
 import org.apache.spark.instrument._
 
-object Call {
+case class SpanStart(id: UUID, process: Any) extends TraceEvent
+case class SpanEnd(id: UUID, process: Any) extends TraceEvent
+
+object Span {
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = {
     val end = System.currentTimeMillis
     val id: UUID = UUID.randomUUID
-    val call = FunctionCall(name, args.toSeq, ret)
-    TraceWriter.log(start, ProcessStart(id, call))
-    TraceWriter.log(end, ProcessEnd(id, call))
+    val call = Fn(name, args.toSeq, ret)
+    TraceWriter.log(start, SpanStart(id, call))
+    TraceWriter.log(end, SpanEnd(id, call))
   }
 }
 
-class Call(cls: String, name: String) extends MethodInstrumentation {
+class Span(cls: String, name: String) extends MethodInstrumentation {
   override def matches(method: CtBehavior): Boolean = check(method, cls, name)
 
   override def apply(method: CtBehavior): Unit = {

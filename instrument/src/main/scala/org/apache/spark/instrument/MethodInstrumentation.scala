@@ -3,13 +3,11 @@ package org.apache.spark.instrument
 import java.util.UUID
 import javassist._
 
-trait MethodType
-case class Method(name: String) extends MethodType
-case object Constructor extends MethodType
+trait TraceEvent {
+  def format(): String = toString.split("\n")(0)
+}
 
-case class FunctionCall(name: String, args: Seq[Any], ret: Any)
-case class ProcessStart(id: UUID, process: Any)
-case class ProcessEnd(id: UUID, process: Any)
+case class Fn(name: String, args: Seq[Any], ret: Any) extends TraceEvent
 
 abstract class MethodInstrumentation() {
   final val prefix = "sparkTracingInstr_"
@@ -41,7 +39,7 @@ abstract class MethodInstrumentation() {
     method
   }
 
-  protected def wrap(method: CtBehavior, before: String, after: String): CtBehavior = {
+  protected def wrap(method: CtBehavior, before: String, after: String): CtBehavior = { // FIXME There must be a better way to do this.
     method match {
       case m: CtMethod => wrap(m, before, after)
       case m: CtConstructor => wrap(m, before, after)

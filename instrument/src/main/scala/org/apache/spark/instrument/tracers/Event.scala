@@ -5,7 +5,7 @@ import org.apache.spark.instrument._
 
 object Event {
   def log(name: String, args: Array[Any]): Unit = {
-    TraceWriter.log(System.currentTimeMillis(), FunctionCall(name, args.toSeq, null))
+    TraceWriter.log(System.currentTimeMillis(), Fn(name, args.toSeq, null))
   }
 }
 
