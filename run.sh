@@ -88,6 +88,7 @@ while [[ $# > 0 ]]
 		spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
 		spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
 		spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		spark.extraListeners org.apache.spark.SparkFirehoseListener
 		!
 		cp $basedir/conf/log4j.properties{.template,}
 		cat <<- ! >> $basedir/conf/log4j.properties

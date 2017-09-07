@@ -7,16 +7,18 @@ visualization Jupyter notebook.
 ## Usage
 
 The instrumentation package is in the `instrumentation` directory in the project root.  It is written in Scala and requires SBT to
-compile.  Switching into the directory and running `sbt package` should be sufficient to create the tracing package JAR file in
+compile.  Switching into the directory and running `sbt assembly` should be sufficient to create the tracing assembly JAR file in
 `/instrumentation/target/scala-2.11`.
 
-To use the instrumentation package, the JAR should be placed in the same location on every machine in the Spark cluster.  Then, the
-following configuration options need to be added to `spark-defaults.conf`.  Some of the options may need to be added with `--conf`
-directives on the invocation command-line; I'm investigating why this is the case.
+To use the instrumentation package, the JAR should be placed in the same location on every machine in the Spark cluster.  Be sure
+to use the assembly JAR, not the package JAR.  Then, the following configuration options need to be added to `spark-defaults.conf`.
+Some of the options may need to be added with `--conf` directives on the invocation command-line; I'm investigating why this is the
+case.
 
   - `spark.driver.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
   - `spark.executor.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
-  - (On YARN) `spark.yarn.am.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
+  - On YARN, `spark.yarn.am.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
+  - If you want listener events, `spark.extraListeners` = `org.apache.spark.SparkFirehoseListener`
 
 Spark jobs should now run with instrumentation applied.  After running, one or more `.tsv` files should appear in `/tmp/spark-trace`
 on each machine that ran a Spark component.  These need to be collected into one directory on the machine where the visualization

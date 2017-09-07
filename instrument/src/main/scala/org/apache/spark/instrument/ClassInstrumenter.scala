@@ -21,7 +21,7 @@ class ClassInstrumenter(val config: Config) extends ClassFileTransformer {
   val packages: Set[String] = config.getObject("targets").keySet.asScala.map(_.replace(".", "/")).toSet
 
   val targets: Seq[Tracer] = Seq(new MainLogger) ++ config.getObject("targets").asScala.flatMap(pkg => {
-    config.getConfigList(s"""targets."${pkg._1}"""").asScala.map(target => getTracer(pkg._1, target))
+    config.getConfigList(s"""targets."${pkg._1}"""").asScala.map(target => getTracer(pkg._1, target)) // FIXME Bleh
   })
 
   def instrumentClass(cls: CtClass): CtClass = {
@@ -37,7 +37,7 @@ class ClassInstrumenter(val config: Config) extends ClassFileTransformer {
 
   override def transform(loader: ClassLoader, name: String, curClass: Class[_], protectionDomain: ProtectionDomain,
     buffer: Array[Byte]): Array[Byte] = {
-    if (packages.foldLeft(false)((x, cur) => x || name.startsWith(cur))) {
+    if (packages.exists(x => name.startsWith(x))) {
       val targetClass = ClassPool.getDefault.makeClass(new ByteArrayInputStream(buffer))
       instrumentClass(targetClass).toBytecode()
     }
