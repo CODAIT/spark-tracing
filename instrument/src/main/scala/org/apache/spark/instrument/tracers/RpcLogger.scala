@@ -22,7 +22,7 @@ object RpcLogger {
   def log(client: scala.Function0[TransportClient], msg: Any): Unit = ()
 }
 
-class RpcLogger() extends MethodInstrumentation {
+class RpcLogger() extends Tracer {
   private def isRpc(method: CtBehavior) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnv", "deserialize")
   private def isCreate(method: CtBehavior) = check(method, "org.apache.spark.rpc.netty.NettyRpcEnvFactory", "create")
   override def matches(method: CtBehavior): Boolean = {

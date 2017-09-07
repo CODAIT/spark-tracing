@@ -5,8 +5,9 @@ version := "1.0"
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
-  "javassist" % "javassist" % "3.12.0.GA",
-  "org.apache.spark" % "spark-core_2.11" % "2.2.0"
+  "javassist" % "javassist" % "3.12.0.GA" % "provided",
+  "org.apache.spark" % "spark-core_2.11" % "2.2.0" % "provided",
+  "com.typesafe" % "config" % "1.3.1"
 )
 
 packageOptions in (Compile, packageBin) +=

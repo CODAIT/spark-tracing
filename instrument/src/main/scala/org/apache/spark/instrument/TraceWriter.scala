@@ -7,18 +7,19 @@ import org.apache.spark.instrument.tracers.MainEnd
 
 case class LogLine(time: Long, event: TraceEvent) {
   def format(traceid: String): String = {
-    Seq(traceid, time, event.format).mkString("\t")
+    Seq(traceid, time, event.format()).mkString("\t")
   }
 }
 
 object TraceWriter {
+  private var outdir = new File("")
+
   private val writeq = new LinkedBlockingQueue[LogLine]()
 
   private val writer = new Thread { override def run(): Unit = {
     val id: String = UUID.randomUUID.toString
 
     val out = {
-      val outdir = new File("/tmp/spark-trace")
       val cannotCreate = new RuntimeException("Cannot create trace output directory " + outdir)
       if (outdir.exists && !outdir.isDirectory) throw cannotCreate
       if (!outdir.exists && !outdir.mkdirs()) throw cannotCreate
@@ -39,6 +40,8 @@ object TraceWriter {
 
   def log(time: Long, event: TraceEvent): Unit = writeq.put(LogLine(time, event))
 
-  writer.start()
-
+  def init(output: String): Unit = {
+    outdir = new File(output)
+    writer.start()
+  }
 }

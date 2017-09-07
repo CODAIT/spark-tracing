@@ -17,7 +17,7 @@ object Span {
   }
 }
 
-class Span(cls: String, name: String) extends MethodInstrumentation {
+class Span(cls: String, name: String) extends Tracer {
   override def matches(method: CtBehavior): Boolean = check(method, cls, name)
 
   override def apply(method: CtBehavior): Unit = {

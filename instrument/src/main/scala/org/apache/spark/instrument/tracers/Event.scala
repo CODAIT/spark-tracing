@@ -9,7 +9,7 @@ object Event {
   }
 }
 
-class Event(cls: String, name: String) extends MethodInstrumentation {
+class Event(cls: String, name: String) extends Tracer {
   override def matches(method: CtBehavior): Boolean = check(method, cls, name)
 
   override def apply(method: CtBehavior): Unit = {

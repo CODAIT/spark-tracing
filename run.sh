@@ -56,12 +56,13 @@ while [[ $# > 0 ]]
 		;;
 	"build")
 		pushd "instrument"
-		sbt package
+		sbt assembly
 		popd
 		;;
 	"conf")
 		rdest="$dest"
 		[[ "$local" = "1" ]] && rdest="$distdir"
+		javaagent="-javaagent:$rdest/instrument/instrument-assembly-1.0.jar=$rdest/instrument/standard.conf"
 		cat <<- ! > $basedir/conf/spark-defaults.conf
 		spark.master.ui.port $port
 		spark.worker.ui.port $port
@@ -84,9 +85,9 @@ while [[ $# > 0 ]]
 		spark.executor.cores 1
 		spark.task.cpus 1
 
-		spark.driver.extraJavaOptions -javaagent:$rdest/instrument_2.11-1.0.jar -Diop.version=4.3.0.0
-		spark.yarn.am.extraJavaOptions -javaagent:$rdest/instrument_2.11-1.0.jar -Diop.version=4.3.0.0
-		spark.executor.extraJavaOptions -javaagent:$rdest/instrument_2.11-1.0.jar -Diop.version=4.3.0.0
+		spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
 		!
 		cp $basedir/conf/log4j.properties{.template,}
 		cat <<- ! >> $basedir/conf/log4j.properties

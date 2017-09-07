@@ -32,7 +32,7 @@ object MainLogger {
   }})
 }
 
-class MainLogger extends MethodInstrumentation {
+class MainLogger extends Tracer {
   override def matches(method: CtBehavior): Boolean = {
     check(method, None, Some("main"))
   }

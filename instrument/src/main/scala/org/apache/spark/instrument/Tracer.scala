@@ -9,7 +9,7 @@ trait TraceEvent {
 
 case class Fn(name: String, args: Seq[Any], ret: Any) extends TraceEvent
 
-abstract class MethodInstrumentation() {
+abstract class Tracer() {
   final val prefix = "sparkTracingInstr_"
 
   protected def str(s: String): String = "\"" + s + "\""
@@ -22,10 +22,11 @@ abstract class MethodInstrumentation() {
     val cls = method.getDeclaringClass
     val original = CtNewMethod.copy(method, prefix + method.getName, cls, null)
     cls.addMethod(original)
-    val ret = method.getReturnType.getName
-    val body = "{ " + before +
-      (if (ret != "void") ret + " ret = " else "Object ret = null; ") +
-      original.getName + "($$);" + after + (if (ret != "void") "return ret;" else "") + " }"
+    val delegate = original.getName + "($$)"
+    val body = method.getReturnType match {
+      case x if x == CtClass.voidType => s"{ $before; Object ret = null; $delegate; $after; }"
+      case rettype => s"{ $before; ${rettype.getName} ret = $delegate; $after; return ret; }"
+    }
     method.setBody(body)
     method
   }
@@ -39,7 +40,7 @@ abstract class MethodInstrumentation() {
     method
   }
 
-  protected def wrap(method: CtBehavior, before: String, after: String): CtBehavior = { // FIXME There must be a better way to do this.
+  protected def wrap(method: CtBehavior, before: String, after: String): CtBehavior = {
     method match {
       case m: CtMethod => wrap(m, before, after)
       case m: CtConstructor => wrap(m, before, after)
