@@ -4,7 +4,7 @@ import javassist._
 import org.apache.spark.instrument._
 
 object Event {
-  def log(name: String, args: Array[Any]): Unit = {
+  def log(name: String, args: Array[Any]): Unit = TraceWriter.runAsOverhead {
     TraceWriter.log(System.currentTimeMillis(), Fn(name, args.toSeq, null))
   }
 }

@@ -8,7 +8,7 @@ case class SpanStart(id: UUID, process: Any) extends TraceEvent
 case class SpanEnd(id: UUID, process: Any) extends TraceEvent
 
 object Span {
-  def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = {
+  def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = TraceWriter.runAsOverhead {
     val end = System.currentTimeMillis
     val id: UUID = UUID.randomUUID
     val call = Fn(name, args.toSeq, ret)

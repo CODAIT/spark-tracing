@@ -12,7 +12,7 @@ case class RPC(src: SocketAddress, dst: SocketAddress, payload: Any) extends Tra
 object RpcLogger {
   var curService: Option[String] = None
   def newEndpoint(config: RpcEnvConfig): Unit = curService = Some(config.name)
-  def log(client: TransportClient, msg: Any): Unit = {
+  def log(client: TransportClient, msg: Any): Unit = TraceWriter.runAsOverhead {
     if (curService.isDefined) {
       TraceWriter.log(System.currentTimeMillis, Service(curService.get, client.getChannel.localAddress))
       curService = None

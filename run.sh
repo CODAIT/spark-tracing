@@ -62,7 +62,7 @@ while [[ $# > 0 ]]
 	"conf")
 		rdest="$dest"
 		[[ "$local" = "1" ]] && rdest="$distdir"
-		javaagent="-javaagent:$rdest/instrument/instrument-assembly-1.0.jar=$rdest/instrument/standard.conf"
+		javaagent="-javaagent:$rdest/instrument/instrument-assembly-1.0.jar -Dinstrument.config=$rdest/instrument/standard.conf"
 		cat <<- ! > $basedir/conf/spark-defaults.conf
 		spark.master.ui.port $port
 		spark.worker.ui.port $port

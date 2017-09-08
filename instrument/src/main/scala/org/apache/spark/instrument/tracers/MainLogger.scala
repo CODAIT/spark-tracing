@@ -11,7 +11,7 @@ case object MainEnd extends TraceEvent
 object MainLogger {
   var alreadyLogged = false
 
-  def logStart(): Unit = {
+  def logStart(): Unit = TraceWriter.runAsOverhead {
     if (!alreadyLogged) {
       alreadyLogged = true
       val end = System.currentTimeMillis
@@ -23,7 +23,7 @@ object MainLogger {
     }
   }
 
-  def logEnd(): Unit = {
+  def logEnd(): Unit = TraceWriter.runAsOverhead {
     TraceWriter.log(System.currentTimeMillis(), MainEnd)
   }
 
@@ -34,7 +34,7 @@ object MainLogger {
 
 class MainLogger extends Tracer {
   override def matches(method: CtBehavior): Boolean = {
-    check(method, None, Some("main"))
+    check(method, "*", "main")
   }
 
   override def apply(method: CtBehavior): Unit = {

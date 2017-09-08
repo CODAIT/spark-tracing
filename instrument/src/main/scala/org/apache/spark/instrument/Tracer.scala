@@ -48,14 +48,11 @@ abstract class Tracer() {
     }
   }
 
-  protected def check(method: CtBehavior, cls: Option[String], name: Option[String]): Boolean = {
+  protected def check(method: CtBehavior, cls: String, name: String = "*"): Boolean = {
     !method.isEmpty &&
-      (cls.isEmpty || cls.get == "*" || cls.get == method.getDeclaringClass.getName) &&
-      (name.isEmpty || name.get == "*" || name.get == method.getName)
+      (cls == "*" || cls == method.getDeclaringClass.getName) &&
+      (name == "*" || name == method.getName)
   }
-  protected def check(method: CtBehavior, cls: String, name: String): Boolean = check(method, Some(cls), Some(name))
-  protected def check(method: CtBehavior, cls: String): Boolean = check(method, Some(cls), None)
-
   def matches(method: CtBehavior): Boolean
 
   def apply(method: CtBehavior): Unit
