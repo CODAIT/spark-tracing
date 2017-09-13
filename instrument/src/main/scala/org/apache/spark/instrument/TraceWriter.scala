@@ -1,10 +1,13 @@
 package org.apache.spark.instrument
 
 import java.io.{File, FileWriter}
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicLong
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.instrument.tracers.MainEnd
 
 case class InstrumentOverhead(time: Long) extends TraceEvent
@@ -31,11 +34,18 @@ object TraceWriter {
       new FileWriter(s"${outdir.toString}/$id.tsv")
     }
 
+    /*val out = {
+      val outdir = Config.get[String]("output").getOrElse(throw new RuntimeException("Missing configuration props.output"))
+      val fs = FileSystem.get(new URI(outdir), new Configuration)
+      fs.mkdirs(new Path(outdir))
+      fs.create(new Path(s"$outdir/$id.tsv"))
+    }*/
+
     out.write("id\ttime\ttype\n")
 
     def writeOne(): Unit = {
       val line = writeq.take
-      out.write(line.format(id) + "\n")
+      out.write((line.format(id) + "\n"))
       if (line.event == MainEnd) {
         if (Config.trackOverhead)
           out.write(LogLine(System.currentTimeMillis, InstrumentOverhead(overhead.get)).format(id))

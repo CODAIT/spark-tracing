@@ -13,21 +13,36 @@ resultdir="$HOME/code/spark-tracing/runs"
 cluster="stcindia-node-"
 nnodes=4
 domain="fyre.ibm.com"
-user="dev-user"
 master="${cluster}1.$domain"
 slaves="${cluster}{2..$nnodes}.$domain"
-dest="/test/spark-tracing"
 traceout="/tmp/spark-trace"
 localhadoop="/opt/hadoop"
 port="5010"
-local=1
+nexecs=20
 
-testclass="org.apache.spark.examples.SparkPi"
-testjar="spark-examples_${scalaver}-$sparkver.jar"
-iters=20
+if [[ "$1" = "local" ]]
+	then local=1
+	user="matt"
+	dest=$distdir
+	sparkbench="$basedir/../spark-bench/bin/spark-bench.sh"
+	benchout="$traceout/benchmark.csv"
+elif [[ "$1" = "remote" ]]
+	then local=0
+	user="dev-user"
+	dest="/home/matt/spark"
+	sparkbench="$dest/../spark-bench/bin/spark-bench.sh"
+	benchout="/user/$user/benchmark.csv"
+	benchdest="/home/matt/benchmark.csv"
+else
+	echo "First argument must be local or remote" >&2
+	exit 1
+fi
+shift
 
 while [[ $# > 0 ]]
-	do case "$1" in
+	do action="$1"
+	shift
+	case "$action" in
 	"spark-dist")
 		pushd "$basedir"
 		"dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
@@ -43,12 +58,6 @@ while [[ $# > 0 ]]
 		"build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
 		popd
 		;;
-	"local")
-		local=1
-		;;
-	"remote")
-		local=0
-		;;
 	"clean")
 		pushd "instrument"
 		sbt clean
@@ -60,29 +69,28 @@ while [[ $# > 0 ]]
 		popd
 		;;
 	"conf")
-		rdest="$dest"
-		[[ "$local" = "1" ]] && rdest="$distdir"
-		javaagent="-javaagent:$rdest/instrument/instrument-assembly-1.0.jar -Dinstrument.config=$rdest/instrument/standard.conf"
+		javaagent="-javaagent:$dest/instrument/instrument-assembly-1.0.jar -Dinstrument.config=$dest/instrument/standard.conf"
 		cat <<- ! > $basedir/conf/spark-defaults.conf
 		spark.master.ui.port $port
 		spark.worker.ui.port $port
 		spark.hadoop.yarn.timeline-service.enabled false
 		spark.executor.instances 1
 		spark.executor.memory 512m
-		spark.yarn.jars local:$rdest/jars/*
+		spark.yarn.jars local:$dest/jars/*
 
 		spark.dynamicAllocation.cachedExecutorIdleTimeout 60s
 		spark.dynamicAllocation.enabled true
 		spark.dynamicAllocation.monitor.enabled true
 		spark.dynamicAllocation.executorIdleTimeout 20s
-		spark.dynamicAllocation.initialExecutors 1
-		spark.dynamicAllocation.maxExecutors 8
-		spark.dynamicAllocation.minExecutors 1
+		spark.dynamicAllocation.initialExecutors $nexecs
+		spark.dynamicAllocation.maxExecutors $nexecs
+		spark.dynamicAllocation.minExecutors $nexecs
 		spark.dynamicAllocation.schedulerBacklogTimeout 1s
 		spark.dynamicAllocation.sustainedSchedulerBacklogTimeout 1s
 		spark.shuffle.service.enabled true
 		#spark.eventLog.enabled true
 		spark.executor.cores 1
+		spark.executor.instances $nexecs
 		spark.task.cpus 1
 
 		spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
@@ -95,37 +103,58 @@ while [[ $# > 0 ]]
 		log4j.rootCategory=INFO, console
 		!
 		cat <<- ! > $basedir/conf/spark-env.sh
-		SPARK_HOME=$rdest
+		SPARK_HOME=$dest
 		HADOOP_CONF_DIR=/etc/hadoop/conf
 		!
-
+		cat <<- ! > $distdir/instrument/benchmark.conf
+		spark-bench = {
+			#repeat = 10
+			spark-submit-config = [{
+				workload-suites = [{
+					benchmark-output = "$benchout"
+					workloads = [
+						{
+							name = "timedsleep"
+							partitions = 20
+							sleepms = 50
+						}
+					]
+				}]
+			}]
+		}
+		!
 		rm -rf $distdir/examples/jars/* $distdir/yarn/*
-		ln -s ../../../examples/target/scala-$scalaver/jars/$testjar $distdir/examples/jars
 		ln -s ../../common/network-yarn/target/scala-$scalaver/spark-${sparkver}-yarn-shuffle.jar $distdir/yarn
 		;;
 	"upload")
 		[[ "$local" = "1" ]] && continue
-		rsync -av --copy-unsafe-links --delete --progress $distdir/ $user@$master:$dest
-		ssh -t $user@$master "for host in $slaves; do rsync -av --copy-unsafe-links --delete $dest/ \$host:$dest; done"
+		rsync -rlv --copy-unsafe-links --delete --progress $distdir/ $user@$master:$dest
+		ssh -t $user@$master "for host in $slaves; do rsync -rlv --copy-unsafe-links --delete $dest/ \$host:$dest; done"
 		;;
 	"run")
-		if [[ "$local" = "0" ]]; then
-			ssh -t $user@$master "sudo rm -rf $traceout; for host in $slaves; do ssh -t \$host sudo rm -rf $traceout; done"
-			ssh -t $user@$master sudo -iu notebook $dest/bin/spark-submit --master yarn --class "$testclass" "$dest/examples/jars/$testjar" $iters
+		if [[ "$local" = "0" ]]
+			then ssh -t $user@$master "sudo rm -rf $traceout; sudo rm -rf $benchdest; for host in $slaves; do ssh -t \$host sudo rm -rf $traceout; done"
+			ssh -t $user@$master "mkdir $benchdest"
+			#for i in {1..10}; do
+				ssh -t $user@$master "SPARK_HOME=$dest SPARK_MASTER_HOST=yarn $sparkbench $dest/instrument/benchmark.conf"
+				ssh -t $user@$master "hdfs dfs -get $benchout/\\*.csv $benchdest"
+				ssh -t $user@$master "hdfs dfs -rm -r $benchout"
+			#done
 		else
 			rm -rf $traceout
-			$distdir/bin/spark-submit --master yarn --class "$testclass" "$distdir/examples/jars/$testjar" $iters
+			SPARK_HOME=$distdir SPARK_MASTER_HOST=yarn $sparkbench $distdir/instrument/benchmark.conf
 		fi
 		;;
 	"collect")
 		[[ "$local" = "1" ]] && continue
 		ssh -t $user@$master "sudo chown -R dev-user $traceout; for host in $slaves; do ssh -t \$host sudo chown -R dev-user $traceout; done" || true
-		ssh -t $user@$master "for host in $slaves; do rsync -av \$host:$traceout/ $traceout; done" || true
-		localout="$resultdir/remote"
-		rm -rf "$localout"
-		mkdir "$localout"
-		rsync -av --progress $user@$master:$traceout/ "$localout"
-		ssh -t $user@$master "rm -r $traceout; for host in $slaves; do ssh -t \$host rm -r $traceout; done" || true
+		ssh -t $user@$master "for host in $slaves; do rsync -rlv \$host:$traceout/ $traceout; done" || true
+		localout=$resultdir/remote
+		rm -rf $localout
+		mkdir $localout
+		rsync -rlv --progress $user@$master:$traceout/ $localout
+		rsync -rlv --progress $user@$master:$benchdest $localout || true
+		ssh -t $user@$master "rm -r $traceout; rm -r $benchdest; for host in $slaves; do ssh -t \$host rm -r $traceout; done" || true
 		;;
 	"yarn")
 		[[ "$local" = "0" ]] && continue
@@ -138,6 +167,5 @@ while [[ $# > 0 ]]
 		exit 1
 		;;
 	esac
-	shift
 done
 

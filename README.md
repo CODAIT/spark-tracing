@@ -11,18 +11,17 @@ compile.  Switching into the directory and running `sbt assembly` should be suff
 `/instrumentation/target/scala-2.11`.
 
 To use the instrumentation package, the JAR should be placed in the same location on every machine in the Spark cluster.  Be sure
-to use the assembly JAR, not the package JAR.  Then, the following configuration options need to be added to `spark-defaults.conf`.
-Some of the options may need to be added with `--conf` directives on the invocation command-line; I'm investigating why this is the
-case.
+to use the assembly JAR, not the package JAR.  Then, make the following changes to `spark-defaults.conf`:
 
-  - `spark.driver.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
-  - `spark.executor.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
-  - On YARN, `spark.yarn.am.extraJavaOptions` = `-javaagent:/path/to/instrumentation.jar`
-  - If you want listener events, `spark.extraListeners` = `org.apache.spark.SparkFirehoseListener`
+  - Set `spark.driver.extraJavaOptions` and `spark.executor.extraJavaOptions` to `-javaagent:/path/to/instrument-assembly.jar
+    -Dinstrument.config=/path/to/instrumentation.conf`.  If running on YARN, also set `spark.yarn.am.extraJavaOptions` to this same
+    value.
 
-Spark jobs should now run with instrumentation applied.  After running, one or more `.tsv` files should appear in `/tmp/spark-trace`
-on each machine that ran a Spark component.  These need to be collected into one directory on the machine where the visualization
-notebook will be run.
+  - If you want listener events (you probably do), also set `spark.extraListeners` to `org.apache.spark.SparkFirehoseListener`.
+
+Spark jobs should now run with instrumentation applied.  After running, one or more `.tsv` files should appear in the directory
+specified by the `props.output` configuration option on each machine that ran a Spark component.  These need to be collected into
+one directory on the machine where the visualization notebook will be run.
 
 The output files contain one line per logged event, with a timestamp and short description for each.  These results may be useful by
 themselves or when analyzed by various external tools; however, this project also provides a Jupyter notebook for visualizing the
