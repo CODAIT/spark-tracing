@@ -27,28 +27,20 @@ object TraceWriter {
     val id: String = UUID.randomUUID.toString
 
     val out = {
-      val outdir = new File(Config.get[String]("output").getOrElse(throw new RuntimeException("Missing configuration props.output")))
-      val cannotCreate = new RuntimeException("Cannot create trace output directory " + outdir)
-      if (outdir.exists && !outdir.isDirectory) throw cannotCreate
-      if (!outdir.exists && !outdir.mkdirs()) throw cannotCreate
-      new FileWriter(s"${outdir.toString}/$id.tsv")
-    }
-
-    /*val out = {
       val outdir = Config.get[String]("output").getOrElse(throw new RuntimeException("Missing configuration props.output"))
       val fs = FileSystem.get(new URI(outdir), new Configuration)
       fs.mkdirs(new Path(outdir))
       fs.create(new Path(s"$outdir/$id.tsv"))
-    }*/
+    }
 
-    out.write("id\ttime\ttype\n")
+    out.write("id\ttime\ttype\n".getBytes)
 
     def writeOne(): Unit = {
       val line = writeq.take
-      out.write((line.format(id) + "\n"))
+      out.write((line.format(id) + "\n").getBytes)
       if (line.event == MainEnd) {
         if (Config.trackOverhead)
-          out.write(LogLine(System.currentTimeMillis, InstrumentOverhead(overhead.get)).format(id))
+          out.write(LogLine(System.currentTimeMillis, InstrumentOverhead(overhead.get)).format(id).getBytes)
         out.close()
       }
       else writeOne()
