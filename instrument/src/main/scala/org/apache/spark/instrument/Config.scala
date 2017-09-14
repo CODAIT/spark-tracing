@@ -1,9 +1,7 @@
 package org.apache.spark.instrument
 
-import java.io.File
-
 import com.typesafe.config._
-
+import java.io.File
 import scala.collection.JavaConverters._
 
 object Config {

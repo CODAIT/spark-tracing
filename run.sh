@@ -3,8 +3,8 @@ set -eu
 
 scalaver="2.11"
 sparkver="2.3.0-SNAPSHOT" #$(cat $basedir/docs/_config.yml | grep '^SPARK_VERSION:' | cut -d ' ' -f 2)
-hadoopver="2.8.1"
-hadoopvershort=2.7 #$(echo "$hadoopver" | cut -d '.' -f -2)
+hadoopver="2.7.4"
+hadoopvershort=$(echo "$hadoopver" | cut -d '.' -f -2)
 
 basedir="$HOME/code/spark"
 distdir="$basedir/mindist"
@@ -20,24 +20,22 @@ localhadoop="/opt/hadoop"
 port="5010"
 nexecs=20
 
-if [[ "$1" = "local" ]]
-	then local=1
-	user="matt"
-	dest=$distdir
-	sparkbench="$basedir/../spark-bench/bin/spark-bench.sh"
-	benchout="$traceout/benchmark.csv"
-elif [[ "$1" = "remote" ]]
+if [[ "$1" = "remote" ]]
 	then local=0
 	user="dev-user"
 	dest="/home/matt/spark"
 	sparkbench="$dest/../spark-bench/bin/spark-bench.sh"
 	benchout="/user/$user/benchmark.csv"
 	benchdest="/home/matt/benchmark.csv"
+	shift
 else
-	echo "First argument must be local or remote" >&2
-	exit 1
+	[[ "$1" = "local" ]] && shift
+	local=1
+	user="matt"
+	dest=$distdir
+	sparkbench="$basedir/../spark-bench/bin/spark-bench.sh"
+	benchout="$traceout/benchmark.csv"
 fi
-shift
 
 while [[ $# > 0 ]]
 	do action="$1"
@@ -59,12 +57,18 @@ while [[ $# > 0 ]]
 		popd
 		;;
 	"clean")
-		pushd "instrument"
+		pushd instrument
+		sbt clean
+		popd
+		pushd process
 		sbt clean
 		popd
 		;;
 	"build")
-		pushd "instrument"
+		pushd instrument
+		sbt assembly
+		popd
+		pushd process
 		sbt assembly
 		popd
 		;;
@@ -93,10 +97,10 @@ while [[ $# > 0 ]]
 		spark.executor.instances $nexecs
 		spark.task.cpus 1
 
-		spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		spark.extraListeners org.apache.spark.SparkFirehoseListener
+		#spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		#spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		#spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+		#spark.extraListeners org.apache.spark.SparkFirehoseListener
 		!
 		cp $basedir/conf/log4j.properties{.template,}
 		cat <<- ! >> $basedir/conf/log4j.properties
@@ -136,9 +140,9 @@ while [[ $# > 0 ]]
 			then ssh -t $user@$master "sudo rm -rf $traceout; sudo rm -rf $benchdest; for host in $slaves; do ssh -t \$host sudo rm -rf $traceout; done"
 			ssh -t $user@$master "mkdir $benchdest"
 			#for i in {1..10}; do
-				ssh -t $user@$master "SPARK_HOME=$dest SPARK_MASTER_HOST=yarn $sparkbench $dest/instrument/benchmark.conf"
-				ssh -t $user@$master "hdfs dfs -get $benchout/\\*.csv $benchdest"
-				ssh -t $user@$master "hdfs dfs -rm -r $benchout"
+			ssh -t $user@$master "SPARK_HOME=$dest SPARK_MASTER_HOST=yarn $sparkbench $dest/instrument/benchmark.conf"
+			ssh -t $user@$master "hdfs dfs -get $benchout/\\*.csv $benchdest"
+			ssh -t $user@$master "hdfs dfs -rm -r $benchout"
 			#done
 		else
 			rm -rf $traceout

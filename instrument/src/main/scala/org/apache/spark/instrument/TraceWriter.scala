@@ -1,6 +1,5 @@
 package org.apache.spark.instrument
 
-import java.io.{File, FileWriter}
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
@@ -14,7 +13,7 @@ case class InstrumentOverhead(time: Long) extends TraceEvent
 
 case class LogLine(time: Long, event: TraceEvent) {
   def format(traceid: String): String = {
-    Seq(traceid, time, event.format()).mkString("\t")
+    Seq(traceid, time, event.format()).mkString("(", ",", ")")
   }
 }
 
@@ -30,10 +29,8 @@ object TraceWriter {
       val outdir = Config.get[String]("output").getOrElse(throw new RuntimeException("Missing configuration props.output"))
       val fs = FileSystem.get(new URI(outdir), new Configuration)
       fs.mkdirs(new Path(outdir))
-      fs.create(new Path(s"$outdir/$id.tsv"))
+      fs.create(new Path(s"$outdir/$id.trace"))
     }
-
-    out.write("id\ttime\ttype\n".getBytes)
 
     def writeOne(): Unit = {
       val line = writeq.take
