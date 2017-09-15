@@ -65,9 +65,9 @@ while [[ $# > 0 ]]
 		popd
 		;;
 	"build")
-		pushd instrument
-		sbt assembly
-		popd
+		#pushd instrument
+		#sbt assembly
+		#popd
 		pushd process
 		sbt assembly
 		popd

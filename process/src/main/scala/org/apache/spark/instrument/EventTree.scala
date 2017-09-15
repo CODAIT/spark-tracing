@@ -4,19 +4,32 @@ import scala.collection.mutable.ListBuffer
 
 trait EventTree {
   def apply(idx: Int): EventTree
+  def is(s: String): Boolean
+  def get: String
+  //def prepend(item: EventTree): EventTree
+  //def append(item: EventTree): EventTree
+  //def rename(name: String): EventTree
+}
+
+case object EventNull extends EventTree {
+  override def toString: String = "<empty>"
+  override def apply(idx: Int): EventTree = EventNull
+  override def is(s: String): Boolean = false
+  override def get: String = throw new IndexOutOfBoundsException("Cannot get value of null node")
 }
 
 case class EventLeaf(value: String) extends EventTree {
   override def toString: String = value
-  override def apply(idx: Int): EventTree = throw new IndexOutOfBoundsException("Cannot get child of leaf node")
+  override def apply(idx: Int): EventTree = EventNull
+  override def is(s: String): Boolean = value == s
+  override def get: String = value
 }
 
-case class EventBranch(name: EventLeaf, children: Seq[EventTree]) extends EventTree {
-  override def toString: String = name + children.mkString("(", ", ", ")")
-  override def apply(idx: Int): EventTree = idx match {
-    case 0 => name
-    case x => children(x - 1)
-  }
+case class EventBranch(children: Seq[EventTree]) extends EventTree {
+  override def toString: String = children.head + children.tail.mkString("(", ", ", ")")
+  override def apply(idx: Int): EventTree = children(idx)
+  override def is(s: String): Boolean = false
+  override def get: String = throw new IndexOutOfBoundsException("Cannot get value of non-leaf node")
 }
 
 object EventTree {
@@ -38,7 +51,7 @@ object EventTree {
   }
   def apply(s: String): EventTree = {
     """\s*([^()]*)(\((.*)\))?\s*""".r.findFirstMatchIn(s) match {
-      case Some(m) if m.group(2) != null && m.group(3) != "" => EventBranch(EventLeaf(m.group(1)), psplit(m.group(3)).map(x => EventTree(x)))
+      case Some(m) if m.group(2) != null && m.group(3) != "" => EventBranch(EventLeaf(m.group(1)) +: psplit(m.group(3)).map(x => EventTree(x)))
       case _ => EventLeaf(s)
     }
   }
