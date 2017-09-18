@@ -1,15 +1,15 @@
 package org.apache.spark.instrument
 
 import java.io.{File, FileWriter}
-import org.apache.spark.rdd.RDD
 
-trait OutputBlockGenerator {
-  def apply(events: RDD[EventTree], services: ServiceMap): OutputBlock
-}
+trait ColType
+case object Num extends ColType { override def toString: String = "num" }
+case object Time extends ColType { override def toString: String = "time" }
+case object Str extends ColType { override def toString: String = "string" }
 
-trait OutputBlock {
+trait OutputBlock extends Serializable {
   def name: String
-  def columns: Seq[String]
+  def columns: Seq[(String, ColType)]
   def data: Iterable[Seq[Any]]
 }
 
@@ -22,9 +22,10 @@ class Output(file: File) {
 
   def addBlock(block: OutputBlock): Unit = {
     writeln(block.name)
-    writeln(block.columns)
+    writeln(block.columns.map(_._1))
+    writeln(block.columns.map(_._2))
     block.data.foreach(row => writeln(row))
-    writeln()
+    writeln("%")
   }
 
   def close(): Unit = out.close()

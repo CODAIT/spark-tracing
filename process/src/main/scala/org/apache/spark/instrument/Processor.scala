@@ -5,13 +5,6 @@ import java.io.File
 import org.apache.spark.instrument.blocks._
 import org.apache.spark.sql.SparkSession
 
-/* 1. Resolution
- * 2. Output
- * 3. Statistics
- * 4. Filtering
- * 5. Transforms
- */
-
 object Processor {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder.appName("Spark Trace Processing").getOrCreate()
@@ -25,9 +18,18 @@ object Processor {
     val in = inputs.reduce(_.union(_))
     // TODO Filtering
     // TODO Transforms
-    val blocks: Set[OutputBlockGenerator] = Set(Axes, RPCs, Events, Spans)
+    // Statistics:
+    // count: execs started, jobs, tasks, block updates
+    // count, min, 25/50/75%, max, min at, max at: JVM start time, RPCs sent, exec lifetime, task duration
+    val blocks: Set[OutputBlock] = Set(
+      new TimeRange(in),
+      new Axes(resolve),
+      new RPCs(in, resolve),
+      new Events(in, resolve),
+      new Spans(in, resolve)
+    )
     val out = new Output(new File("/tmp/spark-trace.out"))
-    blocks.foreach(gen => out.addBlock(gen.apply(in, resolve)))
+    blocks.foreach(block => out.addBlock(block))
     out.close()
   }
 }

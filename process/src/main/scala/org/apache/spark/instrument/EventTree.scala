@@ -6,6 +6,7 @@ trait EventTree {
   def apply(idx: Int): EventTree
   def is(s: String): Boolean
   def get: String
+  def format(spec: String): String = ??? // TODO
   //def prepend(item: EventTree): EventTree
   //def append(item: EventTree): EventTree
   //def rename(name: String): EventTree
@@ -33,7 +34,7 @@ case class EventBranch(children: Seq[EventTree]) extends EventTree {
 }
 
 object EventTree {
-  private def psplit(s: String): Seq[String] = { // TODO
+  private def psplit(s: String): Seq[String] = { // TODO vars and mutables
     var lvl = 0
     val cur = new StringBuilder
     val ret = new ListBuffer[String]
