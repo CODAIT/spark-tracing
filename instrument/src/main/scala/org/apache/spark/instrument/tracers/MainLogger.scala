@@ -34,7 +34,7 @@ object MainLogger {
 
 class MainLogger extends Tracer {
   override def matches(method: CtBehavior): Boolean = {
-    check(method, "*", "main")
+    check(method, "*", "main") && !method.isEmpty
   }
 
   override def apply(method: CtBehavior): Unit = {

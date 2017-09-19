@@ -26,7 +26,10 @@ object Processor {
       new Axes(resolve),
       new RPCs(in, resolve),
       new Events(in, resolve),
-      new Spans(in, resolve)
+      new Spans(in, resolve),
+      //new Stats("count", Seq(), Seq(ColCount), in, resolve),
+      new Stats("dist", Seq(StatJVMStart, StatExecLife, StatRPCCount, StatInstrOver),
+        Seq(ColCount) ++ Seq(0, 25, 50, 75, 100).map(new ColPercentile(_)) ++ Seq(ColArgMin, ColArgMax), in, resolve)
     )
     val out = new Output(new File("/tmp/spark-trace.out"))
     blocks.foreach(block => out.addBlock(block))

@@ -4,33 +4,27 @@ import scala.collection.mutable.ListBuffer
 
 trait EventTree {
   def apply(idx: Int): EventTree
-  def is(s: String): Boolean
-  def get: String
+  def get: Option[String]
   def format(spec: String): String = ??? // TODO
-  //def prepend(item: EventTree): EventTree
-  //def append(item: EventTree): EventTree
-  //def rename(name: String): EventTree
+  def is(x: String): Boolean = get.contains(x)
 }
 
 case object EventNull extends EventTree {
   override def toString: String = "<empty>"
   override def apply(idx: Int): EventTree = EventNull
-  override def is(s: String): Boolean = false
-  override def get: String = throw new IndexOutOfBoundsException("Cannot get value of null node")
+  override def get: Option[String] = None
 }
 
 case class EventLeaf(value: String) extends EventTree {
   override def toString: String = value
   override def apply(idx: Int): EventTree = EventNull
-  override def is(s: String): Boolean = value == s
-  override def get: String = value
+  override def get: Option[String] = Some(value)
 }
 
 case class EventBranch(children: Seq[EventTree]) extends EventTree {
   override def toString: String = children.head + children.tail.mkString("(", ", ", ")")
-  override def apply(idx: Int): EventTree = children(idx)
-  override def is(s: String): Boolean = false
-  override def get: String = throw new IndexOutOfBoundsException("Cannot get value of non-leaf node")
+  override def apply(idx: Int): EventTree = if (idx >= children.size) EventNull else children(idx)
+  override def get: Option[String] = None
 }
 
 object EventTree {
@@ -42,12 +36,12 @@ object EventTree {
       if (c == '(') lvl += 1
       else if ( c == ')') lvl -= 1
       if (c == ',' && lvl == 0) {
-        ret += cur.toString
+        ret += cur.toString.trim
         cur.clear
       }
       else cur += c
     })
-    if (cur.nonEmpty) ret += cur.toString
+    if (cur.nonEmpty) ret += cur.toString.trim
     ret
   }
   def apply(s: String): EventTree = {

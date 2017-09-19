@@ -30,8 +30,8 @@ object ServiceMap {
 class ServiceMap(events: Seq[RDD[EventTree]]) extends Serializable { // FIXME Filtering is another reason to keep this mutable inside
   private def serviceRows(traceid: Int, rdd: RDD[EventTree]) = {
     rdd.filter(_(3)(0).is("Service")).collect.map(x => {
-      val host = ServiceMap.splitHost(x(3)(2).get)
-      ServiceRow(traceid, x(1).get, x(2).get.toLong, x(3)(1).get, host._1, host._2)
+      val host = ServiceMap.splitHost(x(3)(2).get.get)
+      ServiceRow(traceid, x(1).get.get, x(2).get.get.toLong, x(3)(1).get.get, host._1, host._2)
     }).toSeq
   }
   val traces: Map[Int, Trace] = {

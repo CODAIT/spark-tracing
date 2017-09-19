@@ -49,9 +49,7 @@ abstract class Tracer() {
   }
 
   protected def check(method: CtBehavior, cls: String, name: String = "*"): Boolean = {
-    !method.isEmpty &&
-      (cls == "*" || cls == method.getDeclaringClass.getName) &&
-      (name == "*" || name == method.getName)
+    (cls == "*" || cls == method.getDeclaringClass.getName) && (name == "*" || name == method.getName)
   }
   def matches(method: CtBehavior): Boolean
 
