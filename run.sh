@@ -37,39 +37,45 @@ else
 	benchout="$traceout/benchmark.csv"
 fi
 
+component="$1"
+[[ "$component" = "instrument" || "$component" = "spark" || "$component" = "process" ]] || exit 1
+shift
+
 while [[ $# > 0 ]]
 	do action="$1"
 	shift
 	case "$action" in
-	"spark-dist")
-		pushd "$basedir"
-		"dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
-		popd
-		;;
-	"spark-clean")
-		pushd "$basedir"
-		"build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests clean
-		popd
-		;;
-	"spark-build")
-		pushd "$basedir"
-		"build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
-		popd
+	"dist")
+		if [[ "$component" = "spark" ]]
+			then pushd "$basedir"
+			"dev/make-distribution.sh" --name spark-tracing -Pyarn -Phive -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver
+			popd
+		fi
 		;;
 	"clean")
-		pushd instrument
-		sbt clean
-		popd
-		pushd process
-		sbt clean
+		if [[ "$component" = "instrument" ]]
+			then pushd instrument
+			sbt clean
+		elif [[ "$component" = "process" ]]
+			then pushd process
+			sbt clean
+		elif [[ "$component" = "spark" ]]
+			then pushd "$basedir"
+			"build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests clean
+		fi
 		popd
 		;;
 	"build")
-		#pushd instrument
-		#sbt assembly
-		#popd
-		pushd process
-		sbt assembly
+		if [[ "$component" = "instrument" ]]
+			then pushd instrument
+			sbt assembly
+		elif [[ "$component" = "process" ]]
+			then pushd process
+			sbt assembly
+		elif [[ "$component" = "spark" ]]
+			then pushd "$basedir"
+			"build/mvn" -Phive -Pyarn -Phadoop-$hadoopvershort -Dhadoop.version=$hadoopver -DskipTests package
+		fi
 		popd
 		;;
 	"conf")
@@ -96,11 +102,6 @@ while [[ $# > 0 ]]
 		spark.executor.cores 1
 		spark.executor.instances $nexecs
 		spark.task.cpus 1
-
-		#spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		#spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		#spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
-		#spark.extraListeners org.apache.spark.SparkFirehoseListener
 		!
 		cp $basedir/conf/log4j.properties{.template,}
 		cat <<- ! >> $basedir/conf/log4j.properties
@@ -110,23 +111,31 @@ while [[ $# > 0 ]]
 		SPARK_HOME=$dest
 		HADOOP_CONF_DIR=/etc/hadoop/conf
 		!
-		cat <<- ! > $distdir/instrument/benchmark.conf
-		spark-bench = {
-			#repeat = 10
-			spark-submit-config = [{
-				workload-suites = [{
-					benchmark-output = "$benchout"
-					workloads = [
-						{
-							name = "timedsleep"
-							partitions = 20
-							sleepms = 50
-						}
-					]
+		if [[ "$component" = "instrument" ]]
+			then cat <<- ! >> $basedir/conf/spark-defaults.conf
+			spark.driver.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+			spark.yarn.am.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+			spark.executor.extraJavaOptions $javaagent -Diop.version=4.3.0.0
+			spark.extraListeners org.apache.spark.SparkFirehoseListener
+			!
+			cat <<- ! > $distdir/instrument/benchmark.conf
+			spark-bench = {
+				#repeat = 10
+				spark-submit-config = [{
+					workload-suites = [{
+						benchmark-output = "$benchout"
+						workloads = [
+							{
+								name = "timedsleep"
+								partitions = 20
+								sleepms = 50
+							}
+						]
+					}]
 				}]
-			}]
-		}
-		!
+			}
+			!
+		fi
 		rm -rf $distdir/examples/jars/* $distdir/yarn/*
 		ln -s ../../common/network-yarn/target/scala-$scalaver/spark-${sparkver}-yarn-shuffle.jar $distdir/yarn
 		;;
@@ -145,8 +154,12 @@ while [[ $# > 0 ]]
 			ssh -t $user@$master "hdfs dfs -rm -r $benchout"
 			#done
 		else
-			rm -rf $traceout
-			SPARK_HOME=$distdir SPARK_MASTER_HOST=yarn $sparkbench $distdir/instrument/benchmark.conf
+			if [[ "$component" = "instrument" ]]
+				then rm -rf $traceout
+				SPARK_HOME=$distdir SPARK_MASTER_HOST=yarn $sparkbench $distdir/instrument/benchmark.conf
+			elif [[ "$component" = "process" ]]
+				then $distdir/bin/spark-submit --master yarn process/target/scala-2.11/process-assembly-1.0.jar instrument/src/main/resources/standard.conf
+			fi
 		fi
 		;;
 	"collect")

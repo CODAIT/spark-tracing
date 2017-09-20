@@ -45,4 +45,5 @@ class ServiceMap(events: Seq[RDD[EventTree]]) extends Serializable { // FIXME Fi
   def process(uuid: String): Process = processes(uuid)
   def service(host: (String, Int)): Service = services(host)
   def service(host: String): Service = services(ServiceMap.splitHost(host))
+  def mainService(process: String): String = processes(process).services.head.id
 }
