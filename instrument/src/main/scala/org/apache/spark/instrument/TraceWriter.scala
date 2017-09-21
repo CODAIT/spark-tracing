@@ -26,7 +26,7 @@ object TraceWriter {
     val id: String = UUID.randomUUID.toString
 
     val out = {
-      val outdir = Config.get[String]("output").getOrElse(throw new RuntimeException("Missing configuration props.output"))
+      val outdir = Config.get[String]("traceout").getOrElse(throw new RuntimeException("Missing configuration props.traceout"))
       val fs = FileSystem.get(new URI(outdir), new Configuration)
       fs.mkdirs(new Path(outdir))
       fs.create(new Path(s"$outdir/$id.trace"))

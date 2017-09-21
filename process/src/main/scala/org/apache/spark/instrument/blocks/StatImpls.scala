@@ -16,7 +16,7 @@ object StatJVMStart extends StatSource {
 }
 
 object StatInstrOver extends StatSource {
-  val name: String = "Instrument overhead"
+  val name: String = "Instr Overhead"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     events.filter(_(3)(0).is("InstrumentOverhead"))
       .map(row => resolve.mainService(row(1).get.get) -> row(3)(1).get.get.toInt / 1000.0)

@@ -158,7 +158,7 @@ while [[ $# > 0 ]]
 				then rm -rf $traceout
 				SPARK_HOME=$distdir SPARK_MASTER_HOST=yarn $sparkbench $distdir/instrument/benchmark.conf
 			elif [[ "$component" = "process" ]]
-				then $distdir/bin/spark-submit --master yarn process/target/scala-2.11/process-assembly-1.0.jar instrument/src/main/resources/standard.conf
+				then $distdir/bin/spark-submit --master yarn process/target/scala-2.11/process-assembly-1.0.jar instrument/src/main/resources/standard.conf /tmp/spark-trace.2.conf
 			fi
 		fi
 		;;

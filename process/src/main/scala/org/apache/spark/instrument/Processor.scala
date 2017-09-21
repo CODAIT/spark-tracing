@@ -7,12 +7,14 @@ import org.apache.spark.sql.SparkSession
 
 object Processor {
   def main(args: Array[String]): Unit = {
-    val spark = SparkSession.builder.appName("Spark Trace Processing").getOrCreate()
+    val spark = SparkSession.builder.appName("Spark trace processing").getOrCreate()
     import spark.implicits._
-
     val configs = args.map(fname => ConfigFactory.parseFile(new File(fname)))
+    assert(configs.length > 0, "At least one input config is required")
     val inputs = configs.map(config => {
-      spark.read.text(config.getString("props.output")).as[String].rdd.map(x => EventTree(x))
+      val cur = spark.read.text(config.getString("props.traceout")).as[String].rdd.map(x => EventTree(x))
+      val start = cur.map(_(2).get.get.toLong).min
+      cur.map(_.update(Seq(2), t => EventLeaf((t.get.get.toLong - start).toString)))
     })
     val resolve = new ServiceMap(inputs)
     val in = inputs.reduce(_.union(_))
@@ -26,7 +28,7 @@ object Processor {
       new Stats("dist", Seq(StatJVMStart, StatExecLife, StatTaskLength,  StatRPCCount, StatInstrOver),
         Seq(0, 25, 50, 75, 100).map(new ColPercentile(_)) ++ Seq(ColArgMin, ColArgMax), in, resolve)
     )
-    val out = new Output(new File("/tmp/spark-trace.out"))
+    val out = new Output(new File(configs(0).getString("props.result")))
     blocks.foreach(block => out.addBlock(block))
     out.close()
   }

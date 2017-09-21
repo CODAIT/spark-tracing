@@ -23,6 +23,11 @@ object StatUtils {
   }
   def isDagEvent(ev: EventTree, name: String): Boolean =
     fnArgs(ev, "org.apache.spark.scheduler.DAGSchedulerEventProcessLoop.doOnReceive").isDefined && ev(3)(2)(1)(0).is(name)
+  // FIXME I would prefer to include the following function inline where it's used below, but then Spark's closure processor
+  // FIXME tries to serialize the whole Stats class rather than just the fields that are required for this function.  Is
+  // FIXME there a way to tell Spark to only serialize what's necessary?
+  def traceEvents(events: RDD[EventTree], trace: Int, resolve: ServiceMap): RDD[EventTree] =
+    events.filter(event => resolve.processes(event(1).get.get).trace.id == trace)
 }
 
 trait StatSource {
@@ -38,11 +43,14 @@ trait StatCol {
 
 class Stats(id: String, stats: Seq[StatSource], cols: Seq[StatCol], events: RDD[EventTree], resolve: ServiceMap) extends OutputBlock {
   val name: String = "stat:" + id
-  val columns: Seq[(String, ColType)] = Seq("stat" -> Str) ++ cols.map(col => col.name -> col.colType)
+  val columns: Seq[(String, ColType)] = Seq("trace" -> Num, "stat" -> Str) ++ cols.map(col => col.name -> col.colType)
   def data: Iterable[Seq[Any]] = {
-    stats.map(stat => {
-      val values = stat.extract(events, resolve)
-      stat.name +: cols.map(_.calculate(values))
+    resolve.traces.keys.toSeq.sorted.flatMap(trace => { // toSeq ensures the rows remain in the order they are processed here
+      val traceEvents = StatUtils.traceEvents(events, trace, resolve)
+      stats.map(stat => {
+        val values = stat.extract(traceEvents, resolve)
+        trace +: stat.name +: cols.map(_.calculate(values))
+      })
     })
   }
 }
