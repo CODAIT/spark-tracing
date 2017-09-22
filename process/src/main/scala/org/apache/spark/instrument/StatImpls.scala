@@ -1,6 +1,5 @@
-package org.apache.spark.instrument.blocks
+package org.apache.spark.instrument
 
-import org.apache.spark.instrument._
 import org.apache.spark.rdd.RDD
 
 /* TODO Issues:

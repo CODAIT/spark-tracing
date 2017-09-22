@@ -1,6 +1,5 @@
-package org.apache.spark.instrument.blocks
+package org.apache.spark.instrument
 
-import org.apache.spark.instrument._
 import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
 
@@ -45,12 +44,12 @@ class Stats(id: String, stats: Seq[StatSource], cols: Seq[StatCol], events: RDD[
   val name: String = "stat:" + id
   val columns: Seq[(String, ColType)] = Seq("trace" -> Num, "stat" -> Str) ++ cols.map(col => col.name -> col.colType)
   def data: Iterable[Seq[Any]] = {
-    resolve.traces.keys.toSeq.sorted.flatMap(trace => { // toSeq ensures the rows remain in the order they are processed here
+    resolve.traces.keys.toSeq.sorted.flatMap { trace => // toSeq ensures the rows remain in the order they are processed here
       val traceEvents = StatUtils.traceEvents(events, trace, resolve)
-      stats.map(stat => {
+      stats.map { stat =>
         val values = stat.extract(traceEvents, resolve)
         trace +: stat.name +: cols.map(_.calculate(values))
-      })
-    })
+      }
+    }
   }
 }

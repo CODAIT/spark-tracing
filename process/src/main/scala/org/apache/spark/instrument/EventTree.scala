@@ -40,11 +40,11 @@ case class EventBranch(children: Seq[EventTree]) extends EventTree {
 }
 
 object EventTree {
-  private def psplit(s: String): Seq[String] = { // TODO vars and mutables
+  /*private def psplit(s: String): Seq[String] = {
     var lvl = 0
     val cur = new StringBuilder
     val ret = new ListBuffer[String]
-    s.foreach(c => {
+    s.foreach { c =>
       if (c == '(') lvl += 1
       else if ( c == ')') lvl -= 1
       if (c == ',' && lvl == 0) {
@@ -52,13 +52,37 @@ object EventTree {
         cur.clear
       }
       else cur += c
-    })
+    }
     if (cur.nonEmpty) ret += cur.toString.trim
     ret
+  }*/
+  def substrIdx(s: String, start: Int, c: Char): Int = s.zipWithIndex.drop(start + 1).find(_._1 == c).map(_._2).getOrElse(-1)
+  def pskip(s: String, start: Int): Int = {
+    val open = substrIdx(s, start, '(')
+    val close = substrIdx(s, start, ')')
+    if (close < 0) throw new RuntimeException("Mismatched parentheses")
+    if (open < 0 || open > close) close
+    else pskip(s, pskip(s, open))
+  }
+  def psplit(s: String, sep: Char = ','): List[String] = {
+    val firstSep = s.indexOf(sep)
+    val firstParen = s.indexOf('(')
+    if (firstSep < 0) List(s)
+    else if (firstParen < 0) {
+      if (s.indexOf(')') >= 0) throw new RuntimeException("Mismatched parentheses")
+      s.split(sep).toList
+    }
+    else if (firstSep < firstParen) s.substring(0, firstSep) :: psplit(s.substring(firstSep + 1), sep)
+    else {
+      val nextStart = pskip(s, firstParen) + 1
+      val next = psplit(s.substring(nextStart), sep)
+      s.substring(0, nextStart) + next.head :: next.tail
+    }
   }
   def apply(s: String): EventTree = {
     """\s*([^()]*)(\((.*)\))?\s*""".r.findFirstMatchIn(s) match {
-      case Some(m) if m.group(2) != null && m.group(3) != "" => EventBranch(EventLeaf(m.group(1)) +: psplit(m.group(3)).map(x => EventTree(x)))
+      case Some(m) if m.group(2) != null && m.group(3) != "" =>
+        EventBranch(EventLeaf(m.group(1)) +: psplit(m.group(3)).map(EventTree(_)))
       case _ => EventLeaf(s)
     }
   }
