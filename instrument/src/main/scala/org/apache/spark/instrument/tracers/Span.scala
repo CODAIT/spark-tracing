@@ -11,7 +11,7 @@ object Span {
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = TraceWriter.runAsOverhead {
     val end = System.currentTimeMillis
     val id: UUID = UUID.randomUUID
-    val call = Fn(name, args.toSeq, ret)
+    val call = Fn(name, args.toSeq.map(Tracer.arrayWrap), Tracer.arrayWrap(ret))
     TraceWriter.log(start, SpanStart(id, call))
     TraceWriter.log(end, SpanEnd(id, call))
   }

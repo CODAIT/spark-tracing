@@ -9,6 +9,12 @@ trait TraceEvent {
 
 case class Fn(name: String, args: Seq[Any], ret: Any) extends TraceEvent
 
+object Tracer {
+  def arrayWrap(x: Any): Any = {
+    if (x.isInstanceOf[Array[_]]) x.asInstanceOf[Array[Any]].toSeq else x
+  }
+}
+
 abstract class Tracer() {
   final val prefix = "sparkTracingInstr_"
 

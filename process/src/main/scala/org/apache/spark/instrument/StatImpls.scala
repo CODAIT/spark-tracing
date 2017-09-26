@@ -43,7 +43,7 @@ object StatTaskLength extends StatSource {
     (arg1(1).get.get, arg1(2).get.get)
   }
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    StatUtils.timeDelta(events, StatUtils.isDagEvent(_, "BeginEvent"), StatUtils.isDagEvent(_, "CompletionEvent"), taskTuple(_))
+    StatUtils.timeDelta(events, StatUtils.isDagEvent(_, "BeginEvent"), StatUtils.isDagEvent(_, "CompletionEvent"), taskTuple)
       .mapValues(_ / 1000.0).asInstanceOf[Map[Any, Double]]
 }
 
