@@ -1,6 +1,7 @@
 package org.apache.spark.instrument
 
 import org.apache.spark.rdd.RDD
+import scala.util.matching.Regex
 
 case class ServiceRow(trace: Int, uuid: String, start: Long, name: String, host: String, port: Int)
 
@@ -23,7 +24,7 @@ object ServiceMap {
   }
 }
 
-class ServiceMap(events: Seq[RDD[EventTree]]) extends Serializable { // FIXME Filtering is another reason to keep this mutable inside
+class ServiceMap(events: Seq[RDD[EventTree]], removeServices: Set[Regex]) extends Serializable {
   val traces: Map[Int, Trace] = {
     def serviceRows(traceid: Int, rdd: RDD[EventTree]) = {
       rdd.filter(_(3)(0).is("Service")).collect.map { x =>
@@ -35,6 +36,7 @@ class ServiceMap(events: Seq[RDD[EventTree]]) extends Serializable { // FIXME Fi
     val tree = list.groupBy(_.trace).mapValues(_.groupBy(_.uuid))
     tree.map(row => row._1 -> new Trace(row._1, row._2))
   }
+  private def blacklisted(service: Service): Boolean = removeServices.exists(_.pattern.matcher(service.id).matches)
   val processes: Map[String, Process] = traces.flatMap(trace => trace._2.processes.map(process => process.uuid -> process))
   // FIXME Throughout this file we are making the unsafe assumption that host and port uniquely identify a process
   val services: Map[(String, Int), Service] = processes.flatMap(process => process._2.services.map(service => (service.host, service.port) -> service))
@@ -42,5 +44,9 @@ class ServiceMap(events: Seq[RDD[EventTree]]) extends Serializable { // FIXME Fi
   def process(uuid: String): Process = processes(uuid)
   def service(host: (String, Int)): Service = services(host)
   def service(host: String): Service = services(ServiceMap.splitHost(host))
-  def mainService(process: String): String = processes(process).services.head.id
+  //def mainService(process: String): Option[String] = processes(process).services.find(!blacklisted(_)).map(_.id)
+  val mainService: Map[String, Option[String]] =
+    processes.map(process => process._1 -> process._2.services.find(!blacklisted(_)).map(_.id))
+  def filterRPC(src: String, dst: String): Boolean = !blacklisted(service(src)) && !blacklisted(service(dst))
+  def filteredServices: Seq[Service] = services.values.filter(!blacklisted(_)).toSeq.sortBy(svc => (svc.process.trace.id, svc.start))
 }

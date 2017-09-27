@@ -3,6 +3,7 @@ package org.apache.spark.instrument
 import com.typesafe.config._
 import java.io.File
 import org.apache.spark.sql.SparkSession
+import scala.collection.JavaConverters._
 
 object Processor {
   def configProp(config: Config, name: String): String =
@@ -21,11 +22,11 @@ object Processor {
     }
     val transforms = Transforms.getTransforms(config)
     val eventFilters = Transforms.getEventFilters(config)
-    val serviceFilters = Transforms.getServiceFilters(config)
-    val resolve = new ServiceMap(inputs)
-    val in = Transforms.applyFilters(inputs.reduce(_.union(_)), eventFilters, serviceFilters).cache
+    val serviceFilters = config.getStringList("remove-services").asScala.map(_.r).toSet
+    val resolve = new ServiceMap(inputs, serviceFilters)
+    val in = Transforms.applyFilters(inputs.reduce(_.union(_)), eventFilters).cache
     val blocks: Set[OutputBlock] = Set(
-      new TimeRange(in),
+      new TimeRange(in, resolve),
       new Axes(resolve),
       new RPCs(in, resolve),
       new Events(in, resolve, transforms),

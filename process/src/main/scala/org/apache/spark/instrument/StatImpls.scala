@@ -2,12 +2,6 @@ package org.apache.spark.instrument
 
 import org.apache.spark.rdd.RDD
 
-/* TODO Issues:
- * Try switching Double to Numeric and check that "RPCs sent" no longer has a decimal
- * Consider using a Seq of pairs rather than a map, so that we don't have to extract a unique value for every stat
- * In fact, we probably shouldn't be using a map at all, because then we're stuck mapping count-only stats to 0.0
- */
-
 object StatJVMStart extends StatSource {
   val name: String = "JVM start time"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
@@ -18,14 +12,14 @@ object StatInstrOver extends StatSource {
   val name: String = "Instr Overhead"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     events.filter(_(3)(0).is("InstrumentOverhead"))
-      .map(row => resolve.mainService(row(1).get.get) -> row(3)(1).get.get.toInt / 1000.0)
+      .flatMap(row => resolve.mainService(row(1).get.get).map(_ -> row(3)(1).get.get.toInt / 1000.0))
       .collect.toMap
 }
 
 object StatRPCCount extends StatSource {
   val name: String = "RPCs sent"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    events.filter(_(3)(0).is("RPC")).map(row => resolve.mainService(row(1).get.get) -> 1.0)
+    events.filter(_(3)(0).is("RPC")).flatMap(row => resolve.mainService(row(1).get.get).map(_ -> 1.0))
       .reduceByKey(_ + _).collect.toMap
 }
 
@@ -33,7 +27,7 @@ object StatExecLife extends StatSource {
   val name: String = "Executor lifetime"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     StatUtils.timeDelta(events, row => row(3)(0).is("SpanEnd") && row(3)(2).is("JVMStart"), _(3).is("MainEnd"), _(1).get.get)
-      .map(row => (resolve.mainService(row._1), row._2 / 1000.0)).asInstanceOf[Map[Any, Double]]
+      .flatMap(row => resolve.mainService(row._1).map(_ -> row._2 / 1000.0)).asInstanceOf[Map[Any, Double]]
 }
 
 object StatTaskLength extends StatSource {

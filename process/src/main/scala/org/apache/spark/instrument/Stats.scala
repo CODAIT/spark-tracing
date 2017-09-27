@@ -10,10 +10,12 @@ object StatUtils {
     val ends = events.filter(end).map(row => partition(row) -> eventTime(row))
     starts.join(ends).map(row => (row._1, row._2._2 - row._2._1)).collect.toMap
   }
-  def spanLength(events: RDD[EventTree], spanName: String, partition: EventTree => String = _(3)(1).get.get): Map[String, Long] = {
+  def spanLength(events: RDD[EventTree], spanName: String,
+    partition: EventTree => Option[String] = x => Some(x(3)(1).get.get)): Map[String, Long] = {
+    def makeParts(events: RDD[EventTree]) = events.flatMap(row => partition(row).map(part => part -> row(2).get.get.toLong))
     val matches = events.filter(_(3)(2).is(spanName))
-    val starts = matches.filter(_(3)(0).is("SpanStart")).map(row => partition(row) -> row(2).get.get.toLong)
-    val ends = matches.filter(_(3)(0).is("SpanEnd")).map(row => partition(row) -> row(2).get.get.toLong)
+    val starts = makeParts(matches.filter(_(3)(0).is("SpanStart")))
+    val ends = makeParts(matches.filter(_(3)(0).is("SpanEnd")))
     starts.join(ends).map(row => row._1 -> (row._2._2 - row._2._1)).collect.toMap
   }
   def fnArgs(event: EventTree, name: String): Option[EventTree] = {

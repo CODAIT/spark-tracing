@@ -2,7 +2,6 @@ package org.apache.spark.instrument
 
 import com.typesafe.config._
 import org.apache.spark.rdd.RDD
-
 import scala.collection.JavaConverters._
 
 class FormatSpec(spec: String) extends Serializable {
@@ -46,10 +45,6 @@ class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Seriali
   def matches(ev: EventTree): Boolean = conditions.forall(_.check(ev))
 }
 
-class ServiceFilterSpec() extends Serializable {
-  ???
-}
-
 object Transforms {
   def fmtEvent(ev: EventTree, transforms: Map[String, FormatSpec]): String = {
     if (!ev(0).is("Fn")) ev.toString
@@ -72,6 +67,7 @@ object Transforms {
         .filter(isTransformable).map(confToFormatPair(key, _))
     ).filter(_._2.isDefined).toMap.map(x => (x._1, new FormatSpec(x._2.get))) // Can't use mapValues because it returns a non-serializable view
   }
+
   def getEventFilters(config: Config): Seq[EventFilterSpec] = {
     def recursiveFilters(config: Map[String, AnyRef]): Seq[(List[String], Boolean)] = { // HOCON, why?
       config.flatMap { case (key: String, value: AnyRef) =>
@@ -86,10 +82,8 @@ object Transforms {
       .sortBy(_._1.length)
       .map(spec => new EventFilterSpec(spec._1, spec._2))
   }
-  def getServiceFilters(config: Config): Seq[ServiceFilterSpec] = {
-    Seq.empty // TODO
-  }
-  def applyFilters(events: RDD[EventTree], eventFilters: Seq[EventFilterSpec], serviceFilters: Seq[ServiceFilterSpec]): RDD[EventTree] = {
+
+  def applyFilters(events: RDD[EventTree], eventFilters: Seq[EventFilterSpec]): RDD[EventTree] = {
     events.filter(row => eventFilters.filter(_.matches(row)).lastOption.forall(_.value))
   }
 }
