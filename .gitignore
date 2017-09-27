@@ -1,1 +1,17 @@
+*#*#
+*.#*
+*.iml
+*.ipr
+*.iws
+*.pyc
+*.pyo
+*.swp
+*~
+.DS_Store
+.idea/
+.idea_modules/
+
+target/
+/project/project/
+
 .ipynb_checkpoints
