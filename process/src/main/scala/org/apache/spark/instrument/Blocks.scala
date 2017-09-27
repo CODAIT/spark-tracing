@@ -20,22 +20,22 @@ class RPCs(events: RDD[EventTree], resolve: ServiceMap) extends OutputBlock {
   }.collect
 }
 
-class Events(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, FmtSpec]) extends OutputBlock {
+class Events(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, FormatSpec]) extends OutputBlock {
   val name: String = "events"
   val columns: Seq[(String, ColType)] = Seq("time" -> Time, "location" -> Str, "content" -> Str)
   private val nonEvents: Set[String] = Set("SpanStart", "SpanEnd", "RPC", "Service")
   def data: Iterable[Seq[Any]] = events.filter(row => row(3)(0).get.exists(!nonEvents.contains(_)))
-    .map(row => Seq(row(2).get.get, resolve.process(row(1).get.get).services.head.id, Util.fmtEvent(row(3), format))).collect
+    .map(row => Seq(row(2).get.get, resolve.process(row(1).get.get).services.head.id, Transforms.fmtEvent(row(3), format))).collect
 }
 
-class Spans(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, FmtSpec]) extends OutputBlock {
+class Spans(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, FormatSpec]) extends OutputBlock {
   val name: String = "spans"
   val columns: Seq[(String, ColType)] = Seq("start" -> Time, "end" -> Time, "location" -> Str, "content" -> Str)
   def data: Iterable[Seq[Any]] = {
     val starts = events.filter(_(3)(0).is("SpanStart")).map(row => (row(3)(1).get.get, (row(1).get.get, row(2).get.get, row(3)(2))))
     val ends = events.filter(_(3)(0).is("SpanEnd")).map(row => (row(3)(1).get.get, row(2).get.get))
     val all = starts.join(ends).map(_._2) // RDD of ((JVM ID, start time, event), end time)
-    all.map(span => Seq(span._1._2, span._2, resolve.process(span._1._1).services.head.id, Util.fmtEvent(span._1._3, format))).collect
+    all.map(span => Seq(span._1._2, span._2, resolve.process(span._1._1).services.head.id, Transforms.fmtEvent(span._1._3, format))).collect
   }
 }
 

@@ -45,11 +45,6 @@ object Util {
     }
   }
 
-  def fmtEvent(ev: EventTree, transforms: Map[String, FmtSpec]): String = {
-    if (!ev(0).is("Fn")) ev.toString
-    else transforms.get(ev(1)(0).get.get).map(_.format(ev(2))).getOrElse(ev.toString)
-  }
-
   def interleave[T](a: Seq[T], b: Seq[T]): Seq[T] = {
     if (a.isEmpty) b
     else if (b.isEmpty) a

@@ -1,22 +1,5 @@
 package org.apache.spark.instrument
 
-class FmtSpec(spec: String) extends Serializable {
-  trait SpecElem
-  case class Literal(s: String) extends SpecElem
-  case class Extract(path: Seq[Int]) extends SpecElem
-  val parts: Seq[SpecElem] = {
-    Util.tokenize(spec, """\$\d+(\.\d+)*""").zipWithIndex.map { case (token: String, idx: Int) =>
-       if (idx % 2 == 0) Literal(token)
-       else Extract(token.substring(1).split("\\.").map(_.toInt))
-    }
-  }
-  override def toString: String = spec
-  def format(ev: EventTree): String = parts.map {
-    case l: Literal => l.s
-    case e: Extract => ev(e.path).toString
-  }.mkString
-}
-
 trait EventTree {
   def apply(idx: Int): EventTree
   def apply(path: Seq[Int]): EventTree = if (path.isEmpty) this else this.apply(path.head).apply(path.tail)
@@ -36,7 +19,7 @@ case object EventNull extends EventTree {
 
 case class EventLeaf(value: String) extends EventTree {
   override def toString: String = value
-  override def apply(idx: Int): EventTree = EventNull
+  override def apply(idx: Int): EventTree = if (idx == 0) this else EventNull
   override def get: Option[String] = Some(value)
   def update(path: Seq[Int], replace: EventTree => EventTree): EventTree = path match {
     case head :: tail => throw new IndexOutOfBoundsException("Cannot replace child of a leaf node")

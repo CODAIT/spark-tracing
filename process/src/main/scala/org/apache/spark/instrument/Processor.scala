@@ -3,7 +3,6 @@ package org.apache.spark.instrument
 import com.typesafe.config._
 import java.io.File
 import org.apache.spark.sql.SparkSession
-import scala.collection.JavaConverters._
 
 object Processor {
   def configProp(config: Config, name: String): String =
@@ -20,24 +19,11 @@ object Processor {
       val start = cur.map(_(2).get.get.toLong).min
       cur.map(_.update(Seq(2), t => EventLeaf((t.get.get.toLong - start).toString)))
     }
-    val transforms = {
-      def isTransformable(tracer: Config) = Set("event", "span").contains(tracer.getString("type"))
-      def confToFormatPair(pkg: String, conf: Config): (String, Option[String]) = {
-        val className = pkg + "." + conf.getString("class")
-        val methodName = conf.getString("method")
-        val fullName =
-          if (className.endsWith("." + methodName)) className // Constructor
-          else className + "." + methodName
-        val fmtString = if (conf.hasPath("format")) Some(conf.getString("format")).filter(_ != "") else None
-        fullName -> fmtString
-      }
-      config.getObject("targets").keySet().asScala.flatMap(key =>
-        config.getConfig("targets").getObjectList("\"" + key + "\"").asScala.map(_.toConfig)
-          .filter(isTransformable).map(confToFormatPair(key, _))
-      ).filter(_._2.isDefined).toMap.map(x => (x._1, new FmtSpec(x._2.get))) // Can't use mapValues because it returns a non-serializable view
-    }
+    val transforms = Transforms.getTransforms(config)
+    val eventFilters = Transforms.getEventFilters(config)
+    val serviceFilters = Transforms.getServiceFilters(config)
     val resolve = new ServiceMap(inputs)
-    val in = inputs.reduce(_.union(_)).cache
+    val in = Transforms.applyFilters(inputs.reduce(_.union(_)), eventFilters, serviceFilters).cache
     val blocks: Set[OutputBlock] = Set(
       new TimeRange(in),
       new Axes(resolve),
