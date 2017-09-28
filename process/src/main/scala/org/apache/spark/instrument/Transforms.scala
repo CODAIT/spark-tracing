@@ -37,20 +37,23 @@ class FormatSpec(spec: String) extends Serializable {
 }
 
 class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Serializable {
-  val comparisons: Map[String, (String, String) => Boolean] = Map(
-    "=" -> (_ == _),
-    "!=" -> (_ != _),
-    "in" -> ((elem, list) => list.split(",\\s*").contains(elem))
+  val comparisons: Map[String, (EventTree, String) => Boolean] = Map(
+    "=" -> (_.toString == _),
+    "==" -> (_.toString == _),
+    "!=" -> (_.toString != _),
+    "in" -> ((elem, list) => list.split(",\\s*").contains(elem.toString)),
+    "exists" -> ((elem, void) => elem.get.isDefined)
   )
-  case class Cond(field: Seq[Int], comp: (String, String) => Boolean, value: String) {
+  case class Cond(field: Seq[Int], comp: (EventTree, String) => Boolean, value: String) {
     def badPath(ev: EventTree) =
       throw new IndexOutOfBoundsException("The following EventTree does not have path " + field.mkString(".") + ": " + ev)
-    def check(ev: EventTree): Boolean = comp(ev.apply(field).get.getOrElse(badPath(ev)), value)
+    def check(ev: EventTree): Boolean = comp(ev.apply(field), value)
   }
   override def toString: String = condStrs.mkString(" && ") + " => " + value
+  private def pad(arr: Seq[String], len: Int, fill: String = ""): Seq[String] =
+    if (arr.length >= len) arr else pad(arr :+ fill, len, fill)
   val conditions: Seq[Cond] = condStrs.map { cond =>
-    val parts = cond.split("\\s+", 3)
-    require(parts.length == 3, "Invalid condition string")
+    val parts = pad(cond.split("\\s+", 3), 3)
     Cond(
       parts(0).split("\\.").map(_.toInt),
       comparisons.getOrElse(parts(1), throw new IllegalArgumentException("Unknown comparison \"" + parts(1) + "\"")),
@@ -77,7 +80,8 @@ object Transforms {
       val fmtString = if (conf.hasPath("format")) Some(conf.getString("format")).filter(_ != "") else None
       fullName -> fmtString
     }
-    config.getObject("targets").keySet().asScala.flatMap(key =>
+    if (!config.hasPath("targets")) Map.empty[String, FormatSpec]
+    else config.getObject("targets").keySet().asScala.flatMap(key =>
       config.getConfig("targets").getObjectList("\"" + key + "\"").asScala.map(_.toConfig)
         .filter(isTransformable).map(confToFormatPair(key, _))
     ).filter(_._2.isDefined).toMap.map(x => (x._1, new FormatSpec(x._2.get))) // Can't use mapValues because it returns a non-serializable view
@@ -93,7 +97,8 @@ object Transforms {
         }
       }.toSeq
     }
-    recursiveFilters(config.getValue("filters").unwrapped.asInstanceOf[java.util.Map[String, AnyRef]].asScala.toMap)
+    if (!config.hasPath("filters")) Seq.empty[EventFilterSpec]
+    else recursiveFilters(config.getValue("filters").unwrapped.asInstanceOf[java.util.Map[String, AnyRef]].asScala.toMap)
       .sortBy(_._1.length)
       .map(spec => new EventFilterSpec(spec._1, spec._2))
   }

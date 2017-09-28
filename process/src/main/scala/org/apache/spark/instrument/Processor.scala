@@ -19,6 +19,7 @@ import com.typesafe.config._
 import java.io.File
 import org.apache.spark.sql.SparkSession
 import scala.collection.JavaConverters._
+import scala.util.matching.Regex
 
 object Processor {
   def configProp(config: Config, name: String): String =
@@ -37,7 +38,9 @@ object Processor {
     }
     val transforms = Transforms.getTransforms(config)
     val eventFilters = Transforms.getEventFilters(config)
-    val serviceFilters = config.getStringList("remove-services").asScala.map(_.r).toSet
+    val serviceFilters =
+      if (config.hasPath("remove-services")) config.getStringList("remove-services").asScala.map(_.r).toSet
+      else Set.empty[Regex]
     val resolve = new ServiceMap(inputs, serviceFilters)
     val in = Transforms.applyFilters(inputs.reduce(_.union(_)), eventFilters).cache
     val blocks: Set[OutputBlock] = Set(
