@@ -52,14 +52,16 @@ the trace files.  The defaults are good for getting a high-level overview of Spa
 debugging specific areas of the code (mllib, SQL, etc.) or running on a different resource manager, it may be desirable to modify
 this section.
 
-`targets` is a map of package names to arrays of tracers -- let's call this package name "bounding package" of the tracers in the
+`targets` is a map of package names to arrays of tracers -- let's call each package the "bounding package" of the tracers in its
 array.  Each "tracer" implements a specific type of instrumentation that captures and records certain actions.  Tracers are limited
 in scope to instrumenting functions in their bounding package.  The currently available ones are:
 
   - `main`: This logs the JVM start and shutdown processes.  It is always enabled and cannot be specified in the configuration file.
 
   - `rpc`: This instruments `NettyRpcEnv` and `NettyRpcEnvFactory` to capture RPCs that are sent between Spark components.  It does
-    not take any arguments, and its bounding package must be `org.apache.spark.rpc.netty` (or one of its superpackages).
+    not take any arguments, and its bounding package must be `org.apache.spark.rpc.netty` (or one of its superpackages).  This
+    tracer is required to resolve JVM UUIDs to service names, and by extension to filter services.  If it is disabled, UUIDs will be
+    used in place of service names in the visualization.
 
   - `event` and `span`: These instrument a specified function with its arguments and return value.  The `event` tracer logs the
     moment a function was called, which will appear as a single point on the sequence plot.  The `span` tracer also logs the
@@ -71,8 +73,9 @@ in scope to instrumenting functions in their bounding package.  The currently av
     `format` is optional; if defined and not empty, it tells the processor to format the event using that string rather than the
     fully-qualified function name and all of its arguments.  The formatting string determines what is displayed when hovering over
     events in the sequence diagram, so adding simple, descriptive names here can make the visualization a lot easier to understand.
-    The function's arguments can be inserted here using `$1` for the first argument, `$2` for the second, and so on.  (You can
-    actually descend the arguments' event trees using `$1.1` and similar.  See the "Event Trees" section for more information.)
+    The function's arguments can be inserted here using `$1` for the first argument, `$2` for the second, and so on.  If the tracer
+    is a `span`, the return value can also be accessed with `$r` (otherwise `null` will be substituted).  (You can actually descend
+    the arguments' event trees using `$1.1` and similar.  See the "Event Trees" section for more information.)
 
 The only bounding package in the default configuration is `org.apache.spark`.  The instrumentation will iterate over all classes
 defined in each bounding package when they are loaded, searching for ones to instrument.  Thus, it is important not to set them too

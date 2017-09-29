@@ -20,14 +20,14 @@ import scala.reflect.ClassTag
 
 object StatUtils {
   def timeDelta[T: ClassTag](events: RDD[EventTree], start: EventTree => Boolean, end: EventTree => Boolean,
-    partition: EventTree => T, eventTime: EventTree => Long = _(2).get.get.toLong): Map[T, Long] = {
+    partition: EventTree => T, eventTime: EventTree => Long = _(2).get.toLong): Map[T, Long] = {
     val starts = events.filter(start).map(row => partition(row) -> eventTime(row))
     val ends = events.filter(end).map(row => partition(row) -> eventTime(row))
     starts.join(ends).map(row => (row._1, row._2._2 - row._2._1)).collect.toMap
   }
   def spanLength(events: RDD[EventTree], spanName: String,
-    partition: EventTree => Option[String] = x => Some(x(3)(1).get.get)): Map[String, Long] = {
-    def makeParts(events: RDD[EventTree]) = events.flatMap(row => partition(row).map(part => part -> row(2).get.get.toLong))
+    partition: EventTree => Option[String] = x => Some(x(3)(1).get)): Map[String, Long] = {
+    def makeParts(events: RDD[EventTree]) = events.flatMap(row => partition(row).map(part => part -> row(2).get.toLong))
     val matches = events.filter(_(3)(2).is(spanName))
     val starts = makeParts(matches.filter(_(3)(0).is("SpanStart")))
     val ends = makeParts(matches.filter(_(3)(0).is("SpanEnd")))
@@ -43,7 +43,7 @@ object StatUtils {
   // FIXME tries to serialize the whole Stats class rather than just the fields that are required for this function.  Is
   // FIXME there a way to tell Spark to only serialize what's necessary?
   def traceEvents(events: RDD[EventTree], trace: Int, resolve: ServiceMap): RDD[EventTree] =
-    events.filter(event => resolve.processes(event(1).get.get).trace.id == trace)
+    events.filter(event => resolve.processes(event(1).get).trace.id == trace)
 }
 
 trait StatSource {

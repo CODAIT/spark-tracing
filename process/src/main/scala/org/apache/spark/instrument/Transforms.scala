@@ -24,9 +24,17 @@ class FormatSpec(spec: String) extends Serializable {
   case class Literal(s: String) extends SpecElem
   case class Extract(path: Seq[Int]) extends SpecElem
   val parts: Seq[SpecElem] = {
-    Util.tokenize(spec, """\$\d+(\.\d+)*""").zipWithIndex.map { case (token: String, idx: Int) =>
+    Util.tokenize(spec, """\$(\d+|r)(\.\d+)*""").zipWithIndex.map { case (token: String, idx: Int) =>
       if (idx % 2 == 0) Literal(token)
-      else Extract(token.substring(1).split("\\.").map(_.toInt))
+      else {
+        val rawPath = token.substring(1).split("\\.")
+        val path = rawPath.headOption match {
+          case Some("r") => "3" +: rawPath.tail
+          case Some(_) => "2" +: rawPath
+          case None => throw new IllegalArgumentException("Empty extraction path in format specification")
+        }
+        Extract(path.map(_.toInt))
+      }
     }
   }
   override def toString: String = spec
@@ -42,7 +50,7 @@ class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Seriali
     "==" -> (_.toString == _),
     "!=" -> (_.toString != _),
     "in" -> ((elem, list) => list.split(",\\s*").contains(elem.toString)),
-    "exists" -> ((elem, void) => elem.get.isDefined)
+    "exists" -> ((elem, dummy) => elem.isDefined)
   )
   case class Cond(field: Seq[Int], comp: (EventTree, String) => Boolean, value: String) {
     def badPath(ev: EventTree) =
@@ -55,7 +63,7 @@ class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Seriali
   val conditions: Seq[Cond] = condStrs.map { cond =>
     val parts = pad(cond.split("\\s+", 3), 3)
     Cond(
-      parts(0).split("\\.").map(_.toInt),
+      parts.head.split("\\.").map(_.toInt),
       comparisons.getOrElse(parts(1), throw new IllegalArgumentException("Unknown comparison \"" + parts(1) + "\"")),
       parts(2)
     )
@@ -66,7 +74,7 @@ class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Seriali
 object Transforms {
   def fmtEvent(ev: EventTree, transforms: Map[String, FormatSpec]): String = {
     if (!ev(0).is("Fn")) ev.toString
-    else transforms.get(ev(1)(0).get.get).map(_.format(ev(2))).getOrElse(ev.toString)
+    else transforms.get(ev(1)(0).get).map(_.format(ev)).getOrElse(ev.toString)
   }
 
   def getTransforms(config: Config): Map[String, FormatSpec] = {

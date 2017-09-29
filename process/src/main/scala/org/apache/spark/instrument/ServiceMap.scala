@@ -29,7 +29,9 @@ class Process(val trace: Trace, val uuid: String, subtree: Seq[ServiceRow]) exte
 }
 
 class Service(val process: Process, val host: String, val port: Int, val name: String, val start: Long) extends Serializable {
-  val id: String = s"$host $port $name" // [${process.trace.id}]
+  val id: String =
+    if (host != "") s"$host $port $name" // [${process.trace.id}]
+    else name
 }
 
 object ServiceMap {
@@ -42,10 +44,13 @@ object ServiceMap {
 class ServiceMap(events: Seq[RDD[EventTree]], removeServices: Set[Regex]) extends Serializable {
   val traces: Map[Int, Trace] = {
     def serviceRows(traceid: Int, rdd: RDD[EventTree]) = {
-      rdd.filter(_(3)(0).is("Service")).collect.map { x =>
-        val host = ServiceMap.splitHost(x(3)(2).get.get)
-        ServiceRow(traceid, x(1).get.get, x(2).get.get.toLong, x(3)(1).get.get, host._1, host._2)
+      val rows = rdd.filter(_(3)(0).is("Service")).collect.map { x =>
+        val host = ServiceMap.splitHost(x(3)(2).get)
+        ServiceRow(traceid, x(1).get, x(2).get.toLong, x(3)(1).get, host._1, host._2)
       }.toSeq
+      if (rows.nonEmpty) rows
+      else rdd.groupBy(_(1).get).map(row => (row._1, row._2.head)).zipWithIndex.map(row =>
+        ServiceRow(traceid, row._1._1, row._1._2(2).get.toLong, row._1._1, "", row._2.toInt)).collect.toSeq
     }
     val list = events.zipWithIndex.map(x => serviceRows(x._2, x._1)).reduce(_ ++ _)
     val tree = list.groupBy(_.trace).mapValues(_.groupBy(_.uuid))
@@ -53,7 +58,7 @@ class ServiceMap(events: Seq[RDD[EventTree]], removeServices: Set[Regex]) extend
   }
   private def blacklisted(service: Service): Boolean = removeServices.exists(_.pattern.matcher(service.id).matches)
   val processes: Map[String, Process] = traces.flatMap(trace => trace._2.processes.map(process => process.uuid -> process))
-  // FIXME Throughout this file we are making the unsafe assumption that host and port uniquely identify a process
+  // FIXME Throughout this file we are making the unsafe assumption that host and port uniquely identify a service
   val services: Map[(String, Int), Service] = processes.flatMap(process => process._2.services.map(service => (service.host, service.port) -> service))
   def trace(id: Int): Trace = traces(id)
   def process(uuid: String): Process = processes(uuid)

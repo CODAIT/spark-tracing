@@ -20,28 +20,28 @@ import org.apache.spark.rdd.RDD
 object StatJVMStart extends StatSource {
   val name: String = "JVM start time"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    StatUtils.spanLength(events, "JVMStart", row => resolve.mainService(row(1).get.get)).map(row => (row._1, row._2 / 1000.0))
+    StatUtils.spanLength(events, "JVMStart", row => resolve.mainService(row(1).get)).map(row => (row._1, row._2 / 1000.0))
 }
 
 object StatInstrOver extends StatSource {
   val name: String = "Instr Overhead"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     events.filter(_(3)(0).is("InstrumentOverhead"))
-      .flatMap(row => resolve.mainService(row(1).get.get).map(_ -> row(3)(1).get.get.toInt / 1000.0))
+      .flatMap(row => resolve.mainService(row(1).get).map(_ -> row(3)(1).get.toInt / 1000.0))
       .collect.toMap
 }
 
 object StatRPCCount extends StatSource {
   val name: String = "RPCs sent"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    events.filter(_(3)(0).is("RPC")).flatMap(row => resolve.mainService(row(1).get.get).map(_ -> 1.0))
+    events.filter(_(3)(0).is("RPC")).flatMap(row => resolve.mainService(row(1).get).map(_ -> 1.0))
       .reduceByKey(_ + _).collect.toMap
 }
 
 object StatExecLife extends StatSource {
   val name: String = "Executor lifetime"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    StatUtils.timeDelta(events, row => row(3)(0).is("SpanEnd") && row(3)(2).is("JVMStart"), _(3).is("MainEnd"), _(1).get.get)
+    StatUtils.timeDelta(events, row => row(3)(0).is("SpanStart") && row(3)(2).is("JVMStart"), _(3).is("MainEnd"), _(1).get)
       .flatMap(row => resolve.mainService(row._1).map(_ -> row._2 / 1000.0)).asInstanceOf[Map[Any, Double]]
 }
 
@@ -49,7 +49,7 @@ object StatTaskLength extends StatSource {
   val name: String = "Task duration"
   private def taskTuple(ev: EventTree) = {
     val arg1 = ev(3)(2)(1)(1)
-    (arg1(1).get.get, arg1(2).get.get)
+    (arg1(1).get, arg1(2).get)
   }
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     StatUtils.timeDelta(events, StatUtils.isDagEvent(_, "BeginEvent"), StatUtils.isDagEvent(_, "CompletionEvent"), taskTuple)
@@ -59,19 +59,19 @@ object StatTaskLength extends StatSource {
 object StatJVMs extends StatSource {
   val name: String = "JVMs"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    events.filter(row => row(3)(0).is("SpanStart") && row(3)(2).is("JVMStart")).map(_(1).get.get -> 0.0).collect.toMap
+    events.filter(row => row(3)(0).is("SpanStart") && row(3)(2).is("JVMStart")).map(_(1).get -> 0.0).collect.toMap
 }
 
 object StatExecs extends StatSource {
   val name: String = "Executors"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    events.filter(StatUtils.isDagEvent(_, "ExecutorAdded")).map(_(3)(2)(1)(1).get.get -> 0.0).collect.toMap
+    events.filter(StatUtils.isDagEvent(_, "ExecutorAdded")).map(_(3)(2)(1)(1).get -> 0.0).collect.toMap
 }
 
 object StatJobs extends StatSource {
   val name: String = "Jobs"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
-    events.filter(StatUtils.isDagEvent(_, "JobSubmitted")).map(_(3)(2)(1)(1).get.get -> 0.0).collect.toMap
+    events.filter(StatUtils.isDagEvent(_, "JobSubmitted")).map(_(3)(2)(1)(1).get -> 0.0).collect.toMap
 }
 
 object StatTasks extends StatSource {
@@ -83,7 +83,7 @@ object StatBlockUpdates extends StatSource {
   val name: String = "Block updates"
   override def extract(events: RDD[EventTree], resolve: ServiceMap): Map[Any, Double] =
     events.filter(StatUtils.fnArgs(_, "org.apache.spark.storage.BlockManagerMaster.updateBlockInfo").isDefined)
-      .map(_(2).get.get -> 0.0).collect.toMap
+      .map(_(2).get -> 0.0).collect.toMap
 }
 
 object ColCount extends StatCol {

@@ -68,7 +68,14 @@ object Util {
 
   def tokenize(str: String, re: String): Seq[String] = {
     val matches = re.r.findAllIn(str).toSeq
-    val nonmatches = str.split(re)
+    val partialNonmatches = str.split(re).toSeq
+    // Tragically, Regex.split doesn't appear to split if the regex is at the beginning or end of the string unlike String.split
+    val nonmatches = (("^" + re).r.findFirstIn(str).isDefined, (re + "$").r.findFirstIn(str).isDefined) match {
+      case (true, true) => "" +: partialNonmatches :+ ""
+      case (true, false) => "" +: partialNonmatches
+      case (false, true) => partialNonmatches :+ ""
+      case _ => partialNonmatches
+    }
     assert(matches.size == nonmatches.size - 1)
     interleave(nonmatches, matches)
   }

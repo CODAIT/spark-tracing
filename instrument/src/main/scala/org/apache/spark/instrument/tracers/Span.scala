@@ -20,7 +20,7 @@ import javassist._
 import org.apache.spark.instrument._
 
 case class SpanStart(id: UUID, process: Any) extends TraceEvent
-case class SpanEnd(id: UUID, process: Any) extends TraceEvent
+case class SpanEnd(id: UUID) extends TraceEvent
 
 object Span {
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = TraceWriter.runAsOverhead {
@@ -28,7 +28,7 @@ object Span {
     val id: UUID = UUID.randomUUID
     val call = Fn(name, args.toSeq.map(Tracer.arrayWrap), Tracer.arrayWrap(ret))
     TraceWriter.log(start, SpanStart(id, call))
-    TraceWriter.log(end, SpanEnd(id, call))
+    TraceWriter.log(end, SpanEnd(id))
   }
 }
 

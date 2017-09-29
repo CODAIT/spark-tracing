@@ -33,8 +33,8 @@ object Processor {
     val traceFiles = configProp(config, "traceout") +: args.tail
     val inputs = traceFiles.map { file =>
       val cur = spark.read.text(file).as[String].rdd.map(x => EventTree(x))
-      val start = cur.map(_(2).get.get.toLong).min
-      cur.map(_.update(Seq(2), t => EventLeaf((t.get.get.toLong - start).toString)))
+      val start = cur.map(_(2).get.toLong).min
+      cur.map(_.update(Seq(2), t => EventLeaf((t.get.toLong - start).toString)))
     }
     val transforms = Transforms.getTransforms(config)
     val eventFilters = Transforms.getEventFilters(config)
