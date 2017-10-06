@@ -19,7 +19,7 @@ import java.util.UUID
 import javassist._
 
 trait TraceEvent {
-  def format(): String = toString.replaceAll("[\\n\\t]", "; ")
+  def format(): String = toString.replaceAll("[\\n\\t]", ",")
 }
 
 case class Fn(name: String, args: Seq[Any], ret: Any) extends TraceEvent

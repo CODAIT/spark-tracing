@@ -28,7 +28,8 @@ object StatUtils {
   def spanLength(events: RDD[EventTree], spanName: String,
     partition: EventTree => Option[String] = x => Some(x(3)(1).get)): Map[String, Long] = {
     def makeParts(events: RDD[EventTree]) = events.flatMap(row => partition(row).map(part => part -> row(2).get.toLong))
-    val matches = events.filter(_(3)(2).is(spanName))
+    val ids = events.filter(row => row(3)(0).isAny(Seq("SpanStart", "SpanEnd")) && row(3)(2).is(spanName)).map(_(3)(1).get).collect
+    val matches = events.filter(row => row(3)(1).isAny(ids))
     val starts = makeParts(matches.filter(_(3)(0).is("SpanStart")))
     val ends = makeParts(matches.filter(_(3)(0).is("SpanEnd")))
     starts.join(ends).map(row => row._1 -> (row._2._2 - row._2._1)).collect.toMap

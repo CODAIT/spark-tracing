@@ -42,7 +42,7 @@ class Events(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, Fo
   val columns: Seq[(String, ColType)] = Seq("time" -> Time, "location" -> Str, "content" -> Str)
   private val nonEvents: Set[String] = Set("SpanStart", "SpanEnd", "RPC", "Service")
   def data: Iterable[Seq[Any]] = events.filter(row => !row(3)(0).isAny(nonEvents)).flatMap(row =>
-    resolve.mainService(row(1).get).map(service => Seq(row(2).get, service, Transforms.fmtEvent(row(3), format)))
+    resolve.mainService(row(1).get).map(service => Seq(row(2).get, service.id, Transforms.fmtEvent(row(3), format)))
   ).collect
 }
 
@@ -54,7 +54,7 @@ class Spans(events: RDD[EventTree], resolve: ServiceMap, format: Map[String, For
     val ends = events.filter(_(3)(0).is("SpanEnd")).map(row => (row(3)(1).get, row(2).get))
     val all = starts.join(ends).map(_._2) // RDD of ((JVM ID, start time, event), end time)
     all.flatMap(span =>
-      resolve.mainService(span._1._1).map(service => Seq(span._1._2, span._2, service, Transforms.fmtEvent(span._1._3, format)))
+      resolve.mainService(span._1._1).map(service => Seq(span._1._2, span._2, service.id, Transforms.fmtEvent(span._1._3, format)))
     ).collect
   }
 }

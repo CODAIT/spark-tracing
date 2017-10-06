@@ -15,55 +15,39 @@
 
 package org.apache.spark.instrument
 
-trait EventTree {
-  def apply(idx: Int): EventTree
+class EventTree(name: String = "", children: Seq[EventTree] = Seq.empty[EventTree]) extends Serializable {
+  val isNull: Boolean = name.isEmpty && children.forall(_.isNull)
+  val isDefined: Boolean = !isNull
+  def debugPrint(indent: String = ""): Unit = {
+    println(indent + "\"" + name + "\" (" + children.size + ")")
+    children.foreach(_.debugPrint(indent + "    "))
+  }
+  override val toString: String = name + (if (!children.forall(_.isNull)) children.mkString("(", ", ", ")") else "")
+  def apply(idx: Int): EventTree =
+    if (idx == 0) new EventTree(name)
+    else if (idx > children.size) new EventTree()
+    else children(idx - 1)
   def apply(path: Seq[Int]): EventTree = if (path.isEmpty) this else this.apply(path.head).apply(path.tail)
-  def get: String = getOption.getOrElse(throw new IndexOutOfBoundsException("Tried to extract value from empty event tree"))
-  def getOption: Option[String]
+  def getOption: Option[String] = if (name.nonEmpty) Some(name) else None
+  def get: String = getOption.getOrElse(throw new IndexOutOfBoundsException("Tried to extract name from empty event tree"))
   def is(x: String): Boolean = getOption.contains(x)
   def isAny(x: Iterable[String]): Boolean = x.map(is).reduce(_ || _)
-  def isDefined: Boolean
-  def update(path: Seq[Int], replace: EventTree => EventTree): EventTree
+  def update(path: Seq[Int], replace: EventTree => EventTree): EventTree = path match {
+    case head :: tail if children.nonEmpty => new EventTree(name, children.updated(head - 1, children(head - 1).update(tail, replace)))
+    case head :: tail => throw new IndexOutOfBoundsException("Cannot replace child of leaf node")
+    case _ => replace(this)
+  }
   def update(path: Seq[Int], replacement: EventTree): EventTree = update(path, _ => replacement)
-  def update(path: Seq[Int], replacement: String): EventTree = update(path, EventLeaf(replacement))
-}
-
-case object EventNull extends EventTree {
-  override def toString: String = "<empty>"
-  override def apply(idx: Int): EventTree = EventNull
-  override def getOption: Option[String] = None
-  override val isDefined = false
-  def update(path: Seq[Int], replace: EventTree => EventTree): EventTree = throw new IndexOutOfBoundsException("Cannot replace an empty node")
-}
-
-case class EventLeaf(value: String) extends EventTree {
-  override def toString: String = value
-  override def apply(idx: Int): EventTree = if (idx == 0) this else EventNull
-  override def getOption: Option[String] = Some(value)
-  override val isDefined = true
-  def update(path: Seq[Int], replace: EventTree => EventTree): EventTree = path match {
-    case head :: tail => throw new IndexOutOfBoundsException("Cannot replace child of a leaf node")
-    case _ => replace(this)
-  }
-}
-
-case class EventBranch(children: Seq[EventTree]) extends EventTree {
-  override def toString: String = children.head + children.tail.mkString("(", ", ", ")")
-  override def apply(idx: Int): EventTree = if (idx >= children.size) EventNull else children(idx)
-  override def getOption: Option[String] = None
-  override val isDefined = true
-  def update(path: Seq[Int], replace: EventTree => EventTree): EventTree = path match {
-    case head :: tail => EventBranch(children.updated(head, children(head).update(tail, replace)))
-    case _ => replace(this)
-  }
+  def update(path: Seq[Int], replacement: String): EventTree = update(path, new EventTree(replacement))
 }
 
 object EventTree {
   def apply(s: String): EventTree = {
-    """\s*([^()]*)(\((.*)\))?\s*""".r.findFirstMatchIn(s) match {
-      case Some(m) if m.group(2) != null =>
-        EventBranch(EventLeaf(m.group(1)) +: Util.psplit(m.group(3)).map(x => EventTree(x.trim)))
-      case _ => EventLeaf(s)
+    """(?s)\A\s*([^(),]*)\s*(\((.*)\))?\s*\Z""".r.findFirstMatchIn(s) match {
+      case Some(m) if m.group(2) != null && m.group(3).nonEmpty =>
+        new EventTree(m.group(1).trim, Util.psplit(m.group(3)).map(x => EventTree(x.trim)))
+      case Some(m) => new EventTree(m.group(1).trim)
+      case None => throw new RuntimeException("Malformed event tree: " + s)
     }
   }
 }

@@ -64,9 +64,8 @@ class ServiceMap(events: Seq[RDD[EventTree]], removeServices: Set[Regex]) extend
   def process(uuid: String): Process = processes(uuid)
   def service(host: (String, Int)): Service = services(host)
   def service(host: String): Service = services(ServiceMap.splitHost(host))
-  //def mainService(process: String): Option[String] = processes(process).services.find(!blacklisted(_)).map(_.id)
-  val mainService: Map[String, Option[String]] =
-    processes.map(process => process._1 -> process._2.services.find(!blacklisted(_)).map(_.id))
+  val mainService: Map[String, Option[Service]] =
+    processes.map(process => process._1 -> process._2.services.filter(!blacklisted(_)).sortBy(_.start).headOption)
   def filterRPC(src: String, dst: String): Boolean = !blacklisted(service(src)) && !blacklisted(service(dst))
   def filteredServices: Seq[Service] = services.values.filter(!blacklisted(_)).toSeq.sortBy(svc => (svc.process.trace.id, svc.start))
 }

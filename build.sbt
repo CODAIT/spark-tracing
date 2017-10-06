@@ -22,7 +22,8 @@ lazy val instrument = (project in file("instrument")).settings(
   libraryDependencies ++= Seq(
     "javassist" % "javassist" % "3.12.0.GA" % "provided",
     "org.apache.spark" % "spark-core_2.11" % "2.2.0" % "provided",
-    "com.typesafe" % "config" % "1.3.1"
+    "com.typesafe" % "config" % "1.3.1",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ),
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Premain-Class" -> "org.apache.spark.instrument.SparkAgent")
@@ -35,7 +36,8 @@ lazy val process = (project in file("process")).settings(
   libraryDependencies ++= Seq(
     "org.apache.spark" % "spark-core_2.11" % "2.2.0" % "provided",
     "org.apache.spark" % "spark-sql_2.11" % "2.2.0" % "provided",
-    "com.typesafe" % "config" % "1.3.1"
+    "com.typesafe" % "config" % "1.3.1",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   )
 )
 

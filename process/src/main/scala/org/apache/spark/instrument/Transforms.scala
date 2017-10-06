@@ -100,7 +100,8 @@ object Transforms {
       config.flatMap { case (key: String, value: AnyRef) =>
         value match {
           case b: java.lang.Boolean => Seq((if (key == "default") List.empty else List(key)) -> b.booleanValue)
-          case c: java.util.Map[String, AnyRef] => recursiveFilters(c.asScala.toMap).map(item => (key :: item._1, item._2))
+          case c: java.util.Map[String @unchecked, AnyRef @unchecked]  =>
+            recursiveFilters(c.asScala.toMap).map(item => (key :: item._1, item._2))
           case _ => throw new IllegalArgumentException("All filter values must be boolean")
         }
       }.toSeq

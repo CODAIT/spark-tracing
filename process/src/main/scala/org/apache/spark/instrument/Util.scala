@@ -16,25 +16,27 @@
 package org.apache.spark.instrument
 
 object Util {
-  /*import scala.collection.mutable.ListBuffer
-  private def psplit(s: String): Seq[String] = {
+  import scala.collection.mutable.ListBuffer
+  def psplit(s: String): Seq[String] = {
     var lvl = 0
     val cur = new StringBuilder
     val ret = new ListBuffer[String]
     s.foreach { c =>
       if (c == '(') lvl += 1
       else if ( c == ')') lvl -= 1
+      if (lvl < 0) throw new RuntimeException("Mismatched parentheses: " + s)
       if (c == ',' && lvl == 0) {
-        ret += cur.toString.trim
+        ret += cur.toString
         cur.clear
       }
       else cur += c
     }
-    if (cur.nonEmpty) ret += cur.toString.trim
+    if (lvl > 0) throw new RuntimeException("Mismatched parentheses: " + s)
+    ret += cur.toString
     ret
-  }*/
+  }
 
-  def substrIdx(s: String, start: Int, c: Char): Int = s.zipWithIndex.drop(start + 1).find(_._1 == c).map(_._2).getOrElse(-1)
+  /*def substrIdx(s: String, start: Int, c: Char): Int = s.zipWithIndex.drop(start + 1).find(_._1 == c).map(_._2).getOrElse(-1)
 
   def pskip(s: String, start: Int): Int = {
     val open = substrIdx(s, start, '(')
@@ -58,25 +60,14 @@ object Util {
       val next = psplit(s.substring(nextStart), sep)
       s.substring(0, nextStart) + next.head :: next.tail
     }
-  }
-
-  def interleave[T](a: Seq[T], b: Seq[T]): Seq[T] = {
-    if (a.isEmpty) b
-    else if (b.isEmpty) a
-    else a.head +: b.head +: interleave(a.tail, b.tail)
-  }
+  }*/
 
   def tokenize(str: String, re: String): Seq[String] = {
-    val matches = re.r.findAllIn(str).toSeq
-    val partialNonmatches = str.split(re).toSeq
-    // Tragically, Regex.split doesn't appear to split if the regex is at the beginning or end of the string unlike String.split
-    val nonmatches = (("^" + re).r.findFirstIn(str).isDefined, (re + "$").r.findFirstIn(str).isDefined) match {
-      case (true, true) => "" +: partialNonmatches :+ ""
-      case (true, false) => "" +: partialNonmatches
-      case (false, true) => partialNonmatches :+ ""
-      case _ => partialNonmatches
+    val idx = re.r.findAllMatchIn(str).flatMap(m => Seq(m.start, m.start + m.matched.length)).toSeq
+    if (idx.isEmpty) Seq(str)
+    else {
+      val substrs = (0, idx.head) +: (1 until idx.size).map(i => (idx(i - 1), idx(i))) :+ (idx.last, str.length)
+      substrs.map(pair => str.substring(pair._1, pair._2))
     }
-    assert(matches.size == nonmatches.size - 1)
-    interleave(nonmatches, matches)
   }
 }
