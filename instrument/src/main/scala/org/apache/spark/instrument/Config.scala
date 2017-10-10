@@ -21,9 +21,10 @@ import scala.collection.JavaConverters._
 
 object Config {
   private val config = {
-    val missingConfig = "Set the system property instrument.config to the location of the configuration file"
-    val configFile = new File(sys.props.get("instrument.config").getOrElse(throw new RuntimeException(missingConfig)))
-    if (! configFile.exists || ! configFile.canRead || ! configFile.isFile) throw new RuntimeException("Couldn't open instrumentation configuration")
+    val configFile = new File(sys.props.get("instrument.config").getOrElse(throw new
+        RuntimeException("Set the Java property instrument.config to the location of the configuration file")))
+    if (! configFile.exists || ! configFile.canRead || ! configFile.isFile)
+      throw new RuntimeException(s"Couldn't open instrumentation configuration file ${configFile.getAbsolutePath}")
     ConfigFactory.parseFile(configFile)
   }
 

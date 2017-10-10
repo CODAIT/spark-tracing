@@ -32,7 +32,6 @@ object MainLogger {
       val end = System.currentTimeMillis
       val id = UUID.randomUUID
       val start = ManagementFactory.getRuntimeMXBean.getStartTime
-      //TraceWriter.log(start, JVMStart(System.currentTimeMillis - start))
       TraceWriter.log(start, SpanStart(id, JVMStart))
       TraceWriter.log(end, SpanEnd(id))
     }

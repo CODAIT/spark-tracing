@@ -26,7 +26,12 @@ lazy val instrument = (project in file("instrument")).settings(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ),
   packageOptions in (Compile, packageBin) +=
-    Package.ManifestAttributes("Premain-Class" -> "org.apache.spark.instrument.SparkAgent")
+    Package.ManifestAttributes("Premain-Class" -> "org.apache.spark.instrument.SparkAgent"),
+  javaOptions in Test ++= Seq(
+    "-Djava.system.class.loader=org.apache.spark.instrument.TestLoader",
+    s"-Dinstrument.config=${baseDirectory.value}/src/test/resources/test.conf"
+  ),
+  fork in Test := true
 )
 
 lazy val process = (project in file("process")).settings(
