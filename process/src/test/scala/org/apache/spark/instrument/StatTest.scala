@@ -7,14 +7,14 @@ class StatTest extends FlatSpec with Matchers {
   private val sm = new ServiceMap(Seq(in), Set(".*filterMe".r))
 
   "JVMStart stat" should "compute" in {
-    StatJVMStart.extract(in, sm) shouldBe Map(
+    StatJVMStart.extract(in, sm).toMap shouldBe Map(
       "1 1 sparkDriver" -> 0.003,
       "2 1 sparkExecutor" -> 0.002
     )
   }
 
   "InstrOver stat" should "compute" in {
-    StatInstrOver.extract(in, sm) shouldBe Map(
+    StatInstrOver.extract(in, sm).toMap shouldBe Map(
       "1 1 sparkDriver" -> 0.002,
       "2 1 sparkExecutor" -> 0.004
     )
@@ -25,13 +25,13 @@ class StatTest extends FlatSpec with Matchers {
   }
 
   "ExecLife stat" should "compute" in {
-    StatExecLife.extract(in, sm) shouldBe Map(
+    StatExecLife.extract(in, sm).toMap shouldBe Map(
       "2 1 sparkExecutor" -> 0.04
     )
   }
 
   "TaskLength stat" should "compute" in {
-    StatTaskLength.extract(in, sm) shouldBe Map(
+    StatTaskLength.extract(in, sm).toMap shouldBe Map(
       ("1", "1") -> 0.01,
       ("1", "2") -> 0.006
     )

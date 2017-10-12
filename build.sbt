@@ -28,7 +28,7 @@ lazy val instrument = (project in file("instrument")).settings(
   packageOptions in (Compile, packageBin) +=
     Package.ManifestAttributes("Premain-Class" -> "org.apache.spark.instrument.SparkAgent"),
   javaOptions in Test ++= Seq(
-    "-Djava.system.class.loader=org.apache.spark.instrument.TestLoader",
+    "-Djava.system.class.loader=org.apache.spark.instrument.TestLoader", // I'm not sure why this is necessary.
     s"-Dinstrument.config=${baseDirectory.value}/src/test/resources/test.conf"
   ),
   fork in Test := true
