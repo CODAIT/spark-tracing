@@ -41,8 +41,12 @@ class ClassInstrumenter() extends ClassFileTransformer {
   def instrumentClass(cls: CtClass): CtClass = {
     cls.getDeclaredBehaviors.foreach(method => {
       targets.find(_.matches(method)).foreach(target => {
-        println(s"Instrumenting ${method.getLongName} with ${target.toString}")
-        try target.apply(method)
+        //println(s"Instrumenting ${method.getLongName} with ${target.toString}")
+        try {
+          if ((method.getModifiers & Modifier.ABSTRACT) != 0)
+            throw new RuntimeException(s"Cannot instrument abstract method ${method.getLongName}")
+          target.apply(method)
+        }
         catch { case e: Throwable => e.printStackTrace() }
       })}
     )

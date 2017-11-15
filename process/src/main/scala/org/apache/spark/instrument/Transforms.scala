@@ -16,7 +16,6 @@
 package org.apache.spark.instrument
 
 import com.typesafe.config._
-import org.apache.spark.rdd.RDD
 import scala.collection.JavaConverters._
 
 class FormatSpec(spec: String) extends Serializable {
@@ -44,31 +43,15 @@ class FormatSpec(spec: String) extends Serializable {
   }.mkString
 }
 
-class EventFilterSpec(condStrs: Seq[String], val value: Boolean) extends Serializable {
-  val comparisons: Map[String, (EventTree, String) => Boolean] = Map(
-    "=" -> (_.toString == _),
-    "==" -> (_.toString == _),
-    "!=" -> (_.toString != _),
-    "in" -> ((elem, list) => list.split(",\\s*").contains(elem.toString)),
-    "exists" -> ((elem, dummy) => elem.isDefined)
-  )
-  case class Cond(field: Seq[Int], comp: (EventTree, String) => Boolean, value: String) {
-    def badPath(ev: EventTree) =
-      throw new IndexOutOfBoundsException("The following EventTree does not have path " + field.mkString(".") + ": " + ev)
-    def check(ev: EventTree): Boolean = comp(ev.apply(field), value)
-  }
-  override def toString: String = condStrs.mkString(" && ") + " => " + value
-  private def pad(arr: Seq[String], len: Int, fill: String = ""): Seq[String] =
-    if (arr.length >= len) arr else pad(arr :+ fill, len, fill)
-  val conditions: Seq[Cond] = condStrs.map { cond =>
-    val parts = pad(cond.split("\\s+", 3), 3)
-    Cond(
-      parts.head.split("\\.").map(_.toInt),
-      comparisons.getOrElse(parts(1), throw new IllegalArgumentException("Unknown comparison \"" + parts(1) + "\"")),
-      parts(2)
-    )
-  }
-  def matches(ev: EventTree): Boolean = conditions.forall(_.check(ev))
+case class CaseParseSpec(conds: Seq[Cond], toParse: Seq[Seq[Int]]) extends Serializable {
+  def apply(ev: EventTree): EventTree =
+    if (!conds.forall(_.check(ev))) ev
+    else toParse.foldLeft(ev)((ev, path) => ev.update(path, x => EventTree(x.get)))
+}
+
+case class EventFilterSpec(conds: Seq[Cond], value: Boolean) extends Serializable {
+  override def toString: String = conds.mkString(" && ") + " => " + value
+  def matches(ev: EventTree): Boolean = conds.forall(_.check(ev))
 }
 
 object Transforms {
@@ -95,24 +78,9 @@ object Transforms {
     ).filter(_._2.isDefined).toMap.map(x => (x._1, new FormatSpec(x._2.get))) // Can't use mapValues because it returns a non-serializable view
   }
 
-  def getEventFilters(config: Config): Seq[EventFilterSpec] = {
-    def recursiveFilters(config: Map[String, AnyRef]): Seq[(List[String], Boolean)] = { // HOCON, why?
-      config.flatMap { case (key: String, value: AnyRef) =>
-        value match {
-          case b: java.lang.Boolean => Seq((if (key == "default") List.empty else List(key)) -> b.booleanValue)
-          case c: java.util.Map[String @unchecked, AnyRef @unchecked]  =>
-            recursiveFilters(c.asScala.toMap).map(item => (key :: item._1, item._2))
-          case _ => throw new IllegalArgumentException("All filter values must be boolean")
-        }
-      }.toSeq
-    }
-    if (!config.hasPath("filters")) Seq.empty[EventFilterSpec]
-    else recursiveFilters(config.getValue("filters").unwrapped.asInstanceOf[java.util.Map[String, AnyRef]].asScala.toMap)
-      .sortBy(_._1.length)
-      .map(spec => new EventFilterSpec(spec._1, spec._2))
-  }
+  def applyFilters(eventFilters: Seq[EventFilterSpec])(ev: EventTree): Boolean =
+    eventFilters.filter(_.matches(ev)).lastOption.forall(_.value)
 
-  def applyFilters(events: RDD[EventTree], eventFilters: Seq[EventFilterSpec]): RDD[EventTree] = {
-    events.filter(row => eventFilters.filter(_.matches(row)).lastOption.forall(_.value))
-  }
+  def applyCaseParse(parse: Seq[CaseParseSpec])(ev: EventTree): EventTree =
+    parse.foldLeft(ev)((ev, pa) => pa.apply(ev))
 }

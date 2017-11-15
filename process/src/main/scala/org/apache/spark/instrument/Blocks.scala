@@ -17,9 +17,6 @@ package org.apache.spark.instrument
 
 import org.apache.spark.rdd.RDD
 
-// TODO Either carefully document tree extractions OR convert extractions to well-named functions
-// TODO Like: def getFunctionName(ev: EventTree): String = ev(3)(0)
-
 class Axes(resolve: ServiceMap) extends OutputBlock {
   val name: String = "axes"
   val columns: Seq[(String, ColType)] = Seq("name" -> Str)
@@ -65,6 +62,7 @@ class TimeRange(events: RDD[EventTree], resolve: ServiceMap) extends OutputBlock
   def data: Iterable[Seq[Any]] = {
     // This filtering doesn't take RPCs into account, but it shouldn't matter because traces should always start and end with events or spans.
     val times = events.filter(row => resolve.mainService(row(1).get).isDefined).map(_(2).get.toLong)
-    Seq(Seq(times.min), Seq(times.max))
+    if (times.isEmpty) Seq(Seq(0), Seq(0))
+    else Seq(Seq(times.min), Seq(times.max))
   }
 }

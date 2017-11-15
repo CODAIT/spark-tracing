@@ -20,7 +20,7 @@ import org.apache.spark.instrument._
 
 object Event {
   def log(name: String, args: Array[Any]): Unit = TraceWriter.runAsOverhead {
-    TraceWriter.log(System.currentTimeMillis(), Fn(name, args.toSeq.map(Tracer.arrayWrap), null))
+    TraceWriter.log(System.currentTimeMillis(), Fn(name, args, null))
   }
 }
 

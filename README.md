@@ -45,9 +45,14 @@ This section holds basic options affecting the overall run of the program, like 
     visualization notebook's statistics.  Enabling this adds some additional overhead to the instrumentation, so you may want to
     disable it if you aren't interested in this.
 
+  - `mode` (string): This affects the operation of the processor.  By default, it is set to `process`, which results in the behavior
+    described in the "Running" section below.  If this is instead set to `dump`, the processor will not output the processed data.
+    Instead it will dump the filtered and transformed trace events to the file specified in the `result` parameter in a format
+    designed for human consumption.  This can be used to aid in configuring and debugging additions to the configuration file.
+
 ### `targets`
 
-This section is the real meat of the tracing configuration.  It describes what function calls should be instrumented and reported in
+This section is the crux of the tracing configuration.  It describes what function calls should be instrumented and reported in
 the trace files.  The defaults are good for getting a high-level overview of Spark's internal operations if running on YARN, but for
 debugging specific areas of the code (mllib, SQL, etc.) or running on a different resource manager, it may be desirable to modify
 this section.
@@ -126,6 +131,45 @@ strings specifying regular expressions matching services to be removed.  The str
 number, and name of the service, separated by spaces -- for example, `192.168.0.10 56892 SparkExecutor`.  Keep in mind that when a
 service is removed, all events and spans that occur on it and all RPCs sent or received by it are also dropped.
 
+### `case-parse`
+
+This section allows specifying that certain strings should be parsed as Scala `Product` strings of the form `name(arg1, arg2)`.
+Case classes and other product types are automatically broken down into event trees (see below) by the instrumentation before
+dumping them, but regular classes with `toString` methods imitating this formatting will not be split.  This section allows the user
+to selectively parse certain strings to event trees, allowing the user to pretend that they were case classes all along.
+
+The syntax is the same as that of the `filters` section, except that the leaf values are arrays of strings rather than booleans.
+Each such string is the path of a subtree that should be parsed as a case class.  For example, say you have the following event
+tree:
+
+    0.......Fn
+    1.0.......myFunction
+    1.1.........MyCaseClass
+    2.0.......TraversableOnce
+    2.1.........MySubclass(1,123,cat)
+    3.........null
+
+Element `$2.1` is clearly a compound type, but it is treated as a single element.  The following `case-parse` section will match
+trees where `$0` is `Fn` and `$1.0` is `myFunction`, and parse `$2.1` to an event tree.
+
+    case-parse = {
+        "0 = Fn" = {
+            "1.0 = myFunction" = ["2.1"]
+        }
+    }
+
+This will result in the tree being amended to the following:
+
+    0.......Fn
+    1.0.......myFunction
+    1.1.........MyCaseClass
+    2.0.......TraversableOnce
+    2.1.0.......MySubclass
+    2.1.1.........1
+    2.1.2.........123
+    2.1.3.........cat
+    3.........null
+
 ## Running
 
 The first step to running the instrumentation is to instrument Spark and run a job.  Before doing this, the instrumentation JAR from
@@ -141,11 +185,13 @@ be logged as well, you will also need to set `spark.extraListeners` to `org.apac
 To process the results and get the single processed output file, simply run `spark-submit /path/to/processor.jar
 /path/to/instrumentation.conf`.  Generally, the same configuration should be used as was used by the instrumentation.  This will
 read trace files from `traceout` and write the output file to `result`.  It is important that the Spark job be able to read the
-trace files.  For this reason, it is recommended to write the trace files to HDFS rather than to the local filesystem.  It is
-possible to combine the trace files from multiple runs of Spark.  This will display the sequence diagrams for the two jobs
-side-by-side for easy comparison.  To do this, place the trace files for each comparison run in a separate directory, and provide
-these extra directories as additional arguments (as Hadoop `FileSystem` URLs) to the `spark-submit` invocation.  The "primary" trace
-at `traceout`, as well as the comparison traces in the additional arguments, will be read and processed into the single output file.
+trace files.  For this reason, it is recommended to write the trace files to HDFS rather than to the local filesystem.  Under almost
+all circumstances, you should disable tracing before running the processor; otherwise, the processor will try to consume its own
+partially-written trace output.  It is possible to combine the trace files from multiple runs of Spark.  This will display the
+sequence diagrams for the two jobs side-by-side for easy comparison.  To do this, place the trace files for each comparison run in a
+separate directory, and provide these extra directories as additional arguments (as Hadoop `FileSystem` URLs) to the `spark-submit`
+invocation.  The "primary" trace at `traceout`, as well as the comparison traces in the additional arguments, will be read and
+processed into the single output file.
 
 Once the output file has been achieved, open the provided notebook, `Spark Tracing.ipynb`, in Jupyter and edit the first line of the
 last cell to reference the output file.  Then run all cells in sequence.  It may be necessary to install Python's `pandas` and
@@ -161,65 +207,54 @@ by clicking and dragging and by scrolling with the mouse wheel, respectively.
 
 ### Event Trees
 
-Each line in the trace files output by the instrumentation is very similar in format to the default string representation of nested
-Scala case classes: for example, `name(arg, fn(a, b), arg)`.  In order to manipulate and analyze these, the processor parses them
-into a tree representation that can then be transformed and analyzed.  In this project, I refer to them as "event trees".  While
-these are largely internal, understanding them is necessary for anyone who wants to modify Spark-Tracing.  Thus, a quick
-introduction follows.
+Each line in the trace files output by the instrumentation is the recursive decomposition of a Scala `Product` type, usually a case
+class or tuple.  Each product may contain primitives, non-product classes, and other products, which contain more products, and so
+on.  This can be represented with a tree of product types, where the branch nodes are products and the leaf nodes are non-products.
+The tree can then be traversed for analyzing or modifying events.  Each event in the processor is handled as such an tree, which I
+call an "event tree".  While these are largely internal, understanding them is necessary for anyone who wants to modify
+Spark-Tracing.  Thus, a quick introduction follows.
 
 Each node in an event tree has one or more children.  The zeroth child, denoted `$0`, is the name of the node, which has itself as
-its zeroth child.  This is the part of the case class that comes before the opening parenthesis.  The following children, `$1`,
-`$2`, and so on, are the case class's comma-separated arguments.  If the case class is an object (no parentheses) or empty (empty
-parentheses), only `$0` will exist.  Each of these children, in turn, can be objects with only a name or case classes with further
-arguments of their own.  These are denoted by separating indices with periods.  Thus, `$1.0` is the name of the first argument and
-`$1.1` is the first argument of the first argument.
+its zeroth child and has no other children.  This is the name of a case class or `TupleX` for a tuple of size `X`.  The following
+children, `$1`, `$2`, and so on, are the product type's comma-separated arguments.  If the type is not a product or is a product
+with no arguments, only `$0` will exist.  Each of these children, in turn, can have only a name or have further arguments of their
+own.  These are denoted by separating indices with periods.  Thus, `$1.0` is the name of the first argument and `$1.1` is the first
+argument of the first argument.
 
-For illustration, let's look at a typical line from a trace file:
+For illustration, let's look at a typical event tree as formatted by the processor's "dump" mode:
 
-    (03b18074-af72-4104-9244-f16c5d1f42da,1506444010559,SpanStart(ff926f1a-10a7-4e18-88f6-c0491cbf1774,Fn(org.apache.spark.rpc.RpcEnv$.create(java.lang.String,java.lang.String,java.lang.String,int,org.apache.spark.SparkConf,org.apache.spark.SecurityManager,int,boolean),ArrayBuffer(sparkExecutor,localhost.localdomain, localhost.localdomain, -1, org.apache.spark.SparkConf@51d83274,org.apache.spark.SecurityManager@4c165bca, 1, true),org.apache.spark.rpc.netty.NettyRpcEnv@413afd06)))
+    0.......Tuple3
+    1.........e6b1e0ff-9c8f-41cd-a59c-e7d8857a7153
+    2.........6444
+    3.0.......Fn
+    3.1.0.......org.apache.spark.storage.BlockManagerMaster.registerBlockManager
+    3.1.1.........org.apache.spark.storage.BlockManagerId
+    3.1.2.........long
+    3.1.3.........long
+    3.1.4.........org.apache.spark.rpc.RpcEndpointRef
+    3.2.0.......TraversableOnce
+    3.2.1.0.......BlockManagerId
+    3.2.1.1.........driver
+    3.2.1.2.........example.com
+    3.2.1.3.........40510
+    3.2.1.4.........None
+    3.2.2.........384093388
+    3.2.3.........0
+    3.2.4.0.......NettyRpcEndpointRef
+    3.2.4.1.........spark://BlockManagerEndpoint1@example.com:43285
+    3.3.........null
 
-Wow.  Let's break that up a bit:
+For all lines in the trace file, `$0` is `Tuple3`, `$1` is a UUID specifying the current JVM invocation, `$2` is the Java timestamp
+of this event, and `$3` is the event body.  Note that since `$1` and `$2` are plain strings, I could also denote them as `$1.0` or
+`$2.0.0.0`.  In this case, the payload is a `Fn` (that's `$3.0`), indicating that this tree represents a function call event logged
+by the `event` tracer.
 
-    (03b18074-af72-4104-9244-f16c5d1f42da,                    $1
-    1506444010559,                                            $2
-    SpanStart(                                                $3.0
-        ff926f1a-10a7-4e18-88f6-c0491cbf1774,                 $3.1
-        Fn(                                                   $3.2.0
-            org.apache.spark.rpc.RpcEnv$.create(              $3.2.1.0
-                java.lang.String,                             $3.2.1.1
-                java.lang.String,                             $3.2.1.2
-                java.lang.String,                             $3.2.1.3
-                int,                                          $3.2.1.4
-                org.apache.spark.SparkConf,                   $3.2.1.5
-                org.apache.spark.SecurityManager,             $3.2.1.6
-                int,                                          $3.2.1.7
-                boolean                                       $3.2.1.8
-            ),
-            ArrayBuffer(                                      $3.2.2.0
-                sparkExecutor,                                $3.2.2.1
-                localhost.localdomain,                        $3.2.2.2
-                localhost.localdomain,                        $3.2.2.3
-                -1,                                           $3.2.2.4
-                org.apache.spark.SparkConf@51d83274,          $3.2.2.5
-                org.apache.spark.SecurityManager@4c165bca,    $3.2.2.6
-                1,                                            $3.2.2.7
-                true                                          $3.2.2.8
-            ),
-            org.apache.spark.rpc.netty.NettyRpcEnv@413afd06   $3.2.3
-        )
-    ))
-
-For all lines in the trace file, `$0` is empty, `$1` is a UUID specifying this JVM invocation, `$2` is the Java timestamp of this
-event, and `$3` is the event body.  Note that since `$1` and `$2` are plain strings, I could also denote them as `$1.0` or
-`$2.0.0.0`.  In this case, the payload is a `SpanStart` (that's `$3.0`), indicating that this is the start of
-a function call being recorded by a `span` tracer.  `SpanStart`s have as their first argument (`$3.1`) a UUID used to match it with its
-corresponding `SpanEnd`, and as their second argument (`$3.2`) the function call in question.
-
-A function call has `$0` = `Fn`, the fully qualified name of the function as `$1`, a list of the function's arguments as `$2`, and
-its return value as `$3`.  So, we can extract the type of our function call's first argument with `$3.2.1.1` (`java.lang.String`)
-and its value with `$3.2.2.1` (`sparkExecutor`).  In fact, this is how the processor figures out the names of the services that are
-running on each machine.  These same concepts can be used on other lines in the file, and the code makes heavy use of such
-"extraction paths" in formatting and calculating the values that are ultimately plotted.
+A function call has `$0` = `Fn`, the fully qualified name of the function as `$1` (with the types of its arguments as children), a
+list of the function's arguments as `$2`, and its return value as `$3`.  So, we can extract the type of our function call's second
+argument with `$3.1.2` (`long`) and its value with `$3.2.2` (`384093388`).  Note that the first argument, of type `BlockManagerId`,
+is a case class and is broken down into its components (`$3.2.1.0` through `$3.2.1.4`) in the tree.  These same concepts can be used
+on other lines in the file, and the code makes heavy use of such "extraction paths" in formatting and calculating the values that
+are ultimately plotted.
 
 ## Author
 

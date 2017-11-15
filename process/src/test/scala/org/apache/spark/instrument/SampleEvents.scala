@@ -1,3 +1,18 @@
+/* Copyright 2017 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.instrument
 
 object SampleEvents {
@@ -8,7 +23,7 @@ object SampleEvents {
     "deep" -> "a(b(c(d(e(f,g(h(i),j,k,l(m)),n,o,p)),q(r(s(t,u),v,w))),x,y),z,A,B,C(D,E,F,G,H,I,J,K,L,M,N,O(P,Q(R),S),T,U,V,W),X(Y),Z)",
     "parens" -> "(((),(),((),(()),(),()),((((((),(()),(),(),())))),(),()),(((()))),((),())))",
     "special" -> """^*&(}}],\]|(),$%~!#@@@(<>(),$%^''',<""("),*&^('.?,???|)),-=_+_[(?```#!,]]|}(),:,;;%;[),{}{.}}}*p[[(;.'_,'\',\\\>~,~,@!,:;'(&',\`~@())))""",
-    "whitespace" -> "  \t a(\t\t b(  c ,  \r d\t(  e, \n f\r\t , g(h,i)\t, \f\f\t j \n), k \n\n\n), l \f, m\t\n\t\t\t)  \t\r\n",
+    "whitespace" -> "  \t a(\t\t b(  c ,  \r d\t(  e, \n f\r\t , g(h,i)\t, \f\f\t j \n), k \n\n\n), l \f, m\t\n\t\t\t)  \t\r\n", // Vertical tabs, apparently, are not whitespace
     "empty" -> "(,,a,,,b(c,),d(),,(,,),,)",
     "nested" -> "((((((a))))))",
     "nothing" -> ""
@@ -96,5 +111,13 @@ object SampleEvents {
     "(x,9,SpanEnd(c,get))",
     "(x,4,SpanStart(d,ignore))",
     "(x,12,SpanEnd(d,ignore))"
+  )
+
+  val unparsed1 = "name(arg1,arg2(arg2.1))"
+  val unparsed2 = "arg3(arg3.1,arg3.2)"
+  val json = Map(
+  "good" -> """{"type":"Tuple3","fields":["x","y",{"type":"RPC","fields":["a","b","I'm a \"request\""]}]}""",
+  "case" -> s"""{"type":"Tuple3","fields":["test","$unparsed1",{"type":"Test","fields":["x","$unparsed2","y"]}]}""",
+  "bad" -> """{"fields":["a","b"]}"""
   )
 }

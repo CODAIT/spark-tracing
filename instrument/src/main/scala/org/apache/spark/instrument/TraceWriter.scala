@@ -23,12 +23,34 @@ import java.util.concurrent.atomic.AtomicLong
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.instrument.tracers.MainEnd
+import org.json4s._
+import org.json4s.native.Serialization
+
+class EventSerializer extends CustomSerializer[Any](implicit formats => ( { case _: JValue => Unit },
+  {
+    case x if x == null => JNull
+    case x: Product => new JObject(List(
+      "type" -> JString(x.productPrefix),
+      "fields" -> JArray(x.productIterator.map(Extraction.decompose).toList)
+    ))
+    case x: TraversableOnce[_] => new JObject(List(
+      "type" -> JString("TraversableOnce"),
+      "fields" -> JArray(x.map(Extraction.decompose).toList)
+    ))
+    case x: Array[_] => new JObject(List(
+      "type" -> JString("Array"),
+      "fields" -> JArray(x.map(Extraction.decompose).toList)
+    ))
+    case x => JString(x.toString)
+  }
+))
 
 case class InstrumentOverhead(time: Long) extends TraceEvent
 
 case class LogLine(time: Long, event: TraceEvent) {
   def format(traceid: String): String = {
-    Seq(traceid, time, event.format()).mkString("(", ",", ")")
+    implicit val formats = org.json4s.DefaultFormats + new EventSerializer
+    Serialization.write((traceid, time, event))
   }
 }
 

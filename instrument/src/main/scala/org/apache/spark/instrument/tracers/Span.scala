@@ -23,20 +23,24 @@ case class SpanStart(id: UUID, process: Any) extends TraceEvent
 case class SpanEnd(id: UUID) extends TraceEvent
 
 object Span {
+  val varnameStart = "sparkTracing_219d8d0c096b4facbf94d7fb89fb2f77_start" // Try to be unique
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = TraceWriter.runAsOverhead {
     val end = System.currentTimeMillis
     val id: UUID = UUID.randomUUID
-    val call = Fn(name, args.toSeq.map(Tracer.arrayWrap), Tracer.arrayWrap(ret))
+    val call = Fn(name, args, ret)
     TraceWriter.log(start, SpanStart(id, call))
     TraceWriter.log(end, SpanEnd(id))
   }
 }
 
 class Span(cls: String, name: String) extends Tracer {
+  import Span._
   override def matches(method: CtBehavior): Boolean = check(method, cls, name)
 
   override def apply(method: CtBehavior): Unit = {
-    val report = functionCall(this.getClass.getCanonicalName, "log", Seq("start", str(method.getLongName), "$args", "ret"))
-    wrap(method, "long start = System.currentTimeMillis();", report)
+    val report = functionCall(this.getClass.getCanonicalName, "log", Seq(varnameStart, str(method.getLongName), "$args", "$_"))
+    method.addLocalVariable(varnameStart, CtClass.longType)
+    method.insertBefore(s"$varnameStart = System.currentTimeMillis();")
+    method.insertAfter(report)
   }
 }

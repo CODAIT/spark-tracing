@@ -30,7 +30,7 @@ class Process(val trace: Trace, val uuid: String, subtree: Seq[ServiceRow]) exte
 
 class Service(val process: Process, val host: String, val port: Int, val name: String, val start: Long) extends Serializable {
   val id: String =
-    if (host != "") s"$host $port $name" // [${process.trace.id}]
+    if (host != "") s"$host $port $name"
     else name
 }
 
