@@ -20,16 +20,20 @@ import org.scalatest._
 
 class TransformTest extends FlatSpec with Matchers {
   "FormatSpec" should "format event trees" in {
-    Set("test", "$1 test $2.2.1$r.4", "$$x$").foreach(spec => new FormatSpec(spec).toString shouldBe spec)
+    Set("test", "$1 test $2.2.1$r.4", "$$ $").foreach(spec => new FormatSpec(EventT(""), spec).toString shouldBe spec)
 
-    def check(spec: String, tree: String): String = new FormatSpec(spec).format(EventTree(tree, true))
-    check("asd", "(x,a(b),c)") shouldBe "asd"
-    check("x$1x$1.0x", "(x,x(a(b,c)),d)") shouldBe "xa(b, c)xax"
-    check("$1.1$1.1$1.2$0", "(x,y(a(b,c)),d)") shouldBe "bbcy"
-    check("$r.3", "(x,a,b(c,d,e(f)))") shouldBe "e(f)"
-    check("$1", "(a,b,c)") shouldBe ""
-    check("$1.1", "(a,b(x,y),c)") shouldBe ""
-    check("$r", "(a,b)") shouldBe ""
+    def check(target: TraceTarget, spec: String, tree: String): String =
+      new FormatSpec(target, spec).format(EventTree(tree, true))
+    check(EventT(""), "asd", "(x,a(b),c)") shouldBe "asd"
+    check(EventT(""), "x$1x$1.0x", "(x,x(a(b,c)),d)") shouldBe "xa(b, c)xax"
+    check(EventT(""), "$1.1$1.1$1.2$0", "(x,y(a(b,c)),d)") shouldBe "bbcy"
+    check(EventT(""), "$r.3", "(x,a,b(c,d,e(f)))") shouldBe "e(f)"
+    check(EventT(""), "$1", "(a,b,c)") shouldBe ""
+    check(EventT(""), "$1.1", "(a,b(x,y),c)") shouldBe ""
+    check(EventT(""), "$r", "(a,b)") shouldBe ""
+    check(VariableT("", ""), "$1.2x", "(a(b,c),d(e,f))") shouldBe "cx"
+    an [IllegalArgumentException] should be thrownBy check(VariableT("", ""), "$r", "(a,b,c)")
+    an [IllegalArgumentException] should be thrownBy check(EventT(""), "$x", "(a,b,c)")
   }
 
   "EventFilterSpec" should "filter out non-matching events" in {
@@ -126,6 +130,5 @@ class TransformTest extends FlatSpec with Matchers {
     misparse2(2)(0).get shouldBe SampleEvents.unparsed1
     misparse2(2)(1).isDefined shouldBe false
     misparse2(3)(2).get shouldBe SampleEvents.unparsed2
-
   }
 }

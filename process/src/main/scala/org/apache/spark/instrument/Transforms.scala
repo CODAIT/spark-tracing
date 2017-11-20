@@ -18,28 +18,59 @@ package org.apache.spark.instrument
 import com.typesafe.config._
 import scala.collection.JavaConverters._
 
-class FormatSpec(spec: String) extends Serializable {
+trait TraceTarget
+case class EventT(fn: String) extends TraceTarget
+case class VariableT(fn: String, varname: String) extends TraceTarget
+case object OtherT extends TraceTarget
+
+object TraceTarget {
+  def fromConf(pkg: String, config: Config): TraceTarget = {
+    if (! Set("event", "span", "local").contains(config.getString("type"))) OtherT
+    else {
+      val className = pkg + "." + config.getString("class")
+      val methodName = config.getString("method")
+      val fullName =
+        if (className.endsWith("." + methodName)) className // Constructor
+        else className + "." + methodName
+      config.getString("type") match {
+        case "event" | "span" => EventT(fullName)
+        case "local" => VariableT(fullName, config.getString("variable"))
+        case _ => OtherT
+      }
+    }
+  }
+  def fromEvent(ev: EventTree): TraceTarget = ev(0).getOption match {
+    case Some("SpanStart") | Some("Fn") => EventT(ev(1)(0).get)
+    case Some("LocalVariable") => VariableT(ev(1)(0).get, ev(2).get)
+    case _ => OtherT
+  }
+}
+
+class FormatSpec(ttype: TraceTarget, spec: String) extends Serializable {
   trait SpecElem
   case class Literal(s: String) extends SpecElem
   case class Extract(path: Seq[Int]) extends SpecElem
   val parts: Seq[SpecElem] = {
-    Util.tokenize(spec, """\$(\d+|r)(\.\d+)*""").zipWithIndex.map { case (token: String, idx: Int) =>
+    Util.tokenize(spec, """\$(\d+|[a-z])(\.\d+)*""").zipWithIndex.map { case (token: String, idx: Int) =>
       if (idx % 2 == 0) Literal(token)
       else {
         val rawPath = token.substring(1).split("\\.")
-        val path = rawPath.headOption match {
-          case Some("r") => "3" +: rawPath.tail
-          case Some(_) => "2" +: rawPath
-          case None => throw new IllegalArgumentException("Empty extraction path in format specification")
+        val path = (ttype, rawPath.headOption) match {
+          case (EventT(_), Some("r")) => "3" +: rawPath.tail
+          case (_, Some(x)) if x.matches("^[a-z]$") =>
+            throw new IllegalArgumentException(s"Invalid specifier $x in format specification")
+          case (EventT(_), Some(_)) => "2" +: rawPath
+          case (_, Some(_)) => rawPath // VariableT
+          case _ => throw new IllegalArgumentException("Empty extraction path in format specification")
         }
         Extract(path.map(_.toInt))
       }
     }
   }
-  override def toString: String = spec
+  override val toString: String = spec
   def format(ev: EventTree): String = parts.map {
-    case l: Literal => l.s
-    case e: Extract => ev(e.path).toString
+    case Literal(str) => str
+    case Extract(path) => ev(path)
   }.mkString
 }
 
@@ -54,30 +85,26 @@ case class EventFilterSpec(conds: Seq[Cond], value: Boolean) extends Serializabl
   def matches(ev: EventTree): Boolean = conds.forall(_.check(ev))
 }
 
-object Transforms {
-  def fmtEvent(ev: EventTree, transforms: Map[String, FormatSpec]): String = {
-    if (!ev(0).is("Fn")) ev.toString
-    else transforms.get(ev(1)(0).get).map(_.format(ev)).getOrElse(ev.toString)
+class Formatter(transforms: Map[TraceTarget, FormatSpec]) extends Serializable {
+  def format(ev: EventTree): String = {
+    transforms.get(TraceTarget.fromEvent(ev)).map(_.format(ev)).getOrElse(ev.toString)
   }
+}
 
-  def getTransforms(config: Config): Map[String, FormatSpec] = {
-    def isTransformable(tracer: Config) = Set("event", "span").contains(tracer.getString("type"))
-    def confToFormatPair(pkg: String, conf: Config): (String, Option[String]) = {
-      val className = pkg + "." + conf.getString("class")
-      val methodName = conf.getString("method")
-      val fullName =
-        if (className.endsWith("." + methodName)) className // Constructor
-        else className + "." + methodName
+object Formatter {
+  def apply(config: Config) = new Formatter({
+    def confToFormatPair(pkg: String, conf: Config): (TraceTarget, Option[String]) = {
       val fmtString = if (conf.hasPath("format")) Some(conf.getString("format")).filter(_ != "") else None
-      fullName -> fmtString
+      TraceTarget.fromConf(pkg, conf) -> fmtString
     }
-    if (!config.hasPath("targets")) Map.empty[String, FormatSpec]
+    if (!config.hasPath("targets")) Map.empty[TraceTarget, FormatSpec]
     else config.getObject("targets").keySet().asScala.flatMap(key =>
-      config.getConfig("targets").getObjectList("\"" + key + "\"").asScala.map(_.toConfig)
-        .filter(isTransformable).map(confToFormatPair(key, _))
-    ).filter(_._2.isDefined).toMap.map(x => (x._1, new FormatSpec(x._2.get))) // Can't use mapValues because it returns a non-serializable view
-  }
+      config.getConfig("targets").getObjectList("\"" + key + "\"").asScala.map(_.toConfig).map(confToFormatPair(key, _))
+    ).filter(x => x._1 != OtherT && x._2.isDefined).map(x => (x._1, new FormatSpec(x._1, x._2.get))).toMap // Can't use mapValues because it returns a non-serializable view
+  })
+}
 
+object Transforms {
   def applyFilters(eventFilters: Seq[EventFilterSpec])(ev: EventTree): Boolean =
     eventFilters.filter(_.matches(ev)).lastOption.forall(_.value)
 

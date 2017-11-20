@@ -21,8 +21,20 @@ trait TraceEvent
 
 case class Fn(name: String, args: Seq[Any], ret: Any) extends TraceEvent
 
+object Tracer {
+  def box(x: Boolean) = new java.lang.Boolean(x)
+  def box(x: Byte) = new java.lang.Byte(x)
+  def box(x: Char) = new java.lang.Character(x)
+  def box(x: Float) = new java.lang.Float(x)
+  def box(x: Int) = new java.lang.Integer(x)
+  def box(x: Long) = new java.lang.Long(x)
+  def box(x: Short) = new java.lang.Short(x)
+  def box(x: Double) = new java.lang.Double(x)
+  def box(x: AnyRef): AnyRef = x
+}
+
 abstract class Tracer {
-  final val prefix = "sparkTracingInstr_"
+  final val prefix = "sparkTracingInstr_219d8d0c096b4facbf94d7fb89fb2f77_" // Try to be unique
 
   protected def str(s: String): String = "\"" + s + "\""
 

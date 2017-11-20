@@ -23,7 +23,6 @@ case class SpanStart(id: UUID, process: Any) extends TraceEvent
 case class SpanEnd(id: UUID) extends TraceEvent
 
 object Span {
-  val varnameStart = "sparkTracing_219d8d0c096b4facbf94d7fb89fb2f77_start" // Try to be unique
   def log(start: Long, name: String, args: Array[Any], ret: Any): Unit = TraceWriter.runAsOverhead {
     val end = System.currentTimeMillis
     val id: UUID = UUID.randomUUID
@@ -34,7 +33,8 @@ object Span {
 }
 
 class Span(cls: String, name: String) extends Tracer {
-  import Span._
+  private val varnameStart = prefix + "start"
+
   override def matches(method: CtBehavior): Boolean = check(method, cls, name)
 
   override def apply(method: CtBehavior): Unit = {

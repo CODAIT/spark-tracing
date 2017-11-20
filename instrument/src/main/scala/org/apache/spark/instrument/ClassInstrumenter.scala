@@ -27,6 +27,7 @@ class ClassInstrumenter() extends ClassFileTransformer {
     target.getString("type") match {
       case "event" => new Event(pkg + "." + target.getString("class"), target.getString("method"))
       case "span" => new Span(pkg + "." + target.getString("class"), target.getString("method"))
+      case "local" => new Local(pkg + "." + target.getString("class"), target.getString("method"), target.getString("variable"))
       case "rpc" => new RpcLogger
       case x => throw new RuntimeException(s"Unknown tracer type $x")
     }
@@ -40,7 +41,7 @@ class ClassInstrumenter() extends ClassFileTransformer {
 
   def instrumentClass(cls: CtClass): CtClass = {
     cls.getDeclaredBehaviors.foreach(method => {
-      targets.find(_.matches(method)).foreach(target => {
+      targets.filter(_.matches(method)).foreach(target => {
         //println(s"Instrumenting ${method.getLongName} with ${target.toString}")
         try {
           if ((method.getModifiers & Modifier.ABSTRACT) != 0)

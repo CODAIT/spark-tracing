@@ -48,7 +48,7 @@ object Processor {
     }
     val caseParse = CascadingCompare.apply[java.util.ArrayList[String]](config, "case-parse")
       .map(cond => CaseParseSpec(cond._1, cond._2.map(_.split("\\.").toSeq.map(_.toInt))))
-    val transforms = Transforms.getTransforms(config)
+    val transforms = Formatter(config)
     val eventFilters = CascadingCompare.apply[Boolean](config, "filters")
       .map(filter => EventFilterSpec(filter._1, filter._2))
     val serviceFilters =

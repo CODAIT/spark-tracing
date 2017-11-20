@@ -33,11 +33,11 @@ class BlockTest extends FlatSpec with Matchers {
   }
 
   "Events block" should "process data" in {
-    val format = Map(
-      SampleEvents.dagSchedEv -> new FormatSpec("sched($1.0($1.1))"),
-      SampleEvents.blockUpdEv -> new FormatSpec("block($3)"),
-      "add" -> new FormatSpec("$1 + $2 = $r")
-    )
+    val format = new Formatter(Map[TraceTarget, FormatSpec](
+      EventT(SampleEvents.dagSchedEv) -> new FormatSpec(EventT(""), "sched($1.0($1.1))"),
+      EventT(SampleEvents.blockUpdEv) -> new FormatSpec(EventT(""), "block($3)"),
+      EventT("add") -> new FormatSpec(EventT(""), "$1 + $2 = $r")
+    ))
     new Events(in, sm, format).data.toSeq
       .sortBy(_.head.asInstanceOf[String].toLong).toList shouldBe Seq(
       Seq("16", "1 1 sparkDriver", "sched(ExecutorAdded(Exec 1))"),
@@ -56,7 +56,8 @@ class BlockTest extends FlatSpec with Matchers {
   }
 
   "Spans block" should "process data" in {
-    val res = new Spans(in, sm, Map("add" -> new FormatSpec("$1 + $2 = $r"))).data.toSeq
+    val res = new Spans(in, sm, new Formatter(Map[TraceTarget, FormatSpec](EventT("add") ->
+      new FormatSpec(EventT(""), "$1 + $2 = $r")))).data.toSeq
       .sortBy(_.head.asInstanceOf[String].toInt) shouldBe Seq(
       Seq("1", "4", "1 1 sparkDriver", "JVMStart"),
       Seq("2", "4", "2 1 sparkExecutor", "JVMStart"),
