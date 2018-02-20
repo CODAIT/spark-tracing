@@ -17,7 +17,7 @@ name := "spark-tracing"
 
 lazy val instrument = (project in file("instrument")).settings(
   name := "instrument",
-  version := "1.0",
+  version := "1.0.1",
   scalaVersion := "2.11.8",
   libraryDependencies ++= Seq(
     "javassist" % "javassist" % "3.12.0.GA" % "provided",
